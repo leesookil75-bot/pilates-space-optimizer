@@ -1,0 +1,680 @@
+'use client';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import Editor from '@/components/Editor';
+import { EditorCanvasHandle } from '@/components/Editor/EditorCanvas';
+import { EquipmentData, EquipmentType, EQUIPMENT_DIMS } from '@/components/Editor/Equipment';
+import { useSession, signIn } from 'next-auth/react';
+
+export type Point = { x: number; y: number };
+
+export interface RoomData {
+  id: string;
+  name: string;
+  type: 'outer' | 'inner';
+  points: Point[];
+  colorTheme: string; // hex color code
+}
+
+interface AppState {
+  rooms: RoomData[];
+  equipments: EquipmentData[];
+}
+
+export default function Home() {
+  const { data: session, status } = useSession();
+  const [showTutorial, setShowTutorial] = useState(true);
+
+  const [rooms, setRooms] = useState<RoomData[]>([
+    {
+      id: 'outer-1',
+      name: '전체 외벽',
+      type: 'outer',
+      points: [
+        { x: 100, y: 100 },
+        { x: 600, y: 100 },
+        { x: 600, y: 600 },
+        { x: 100, y: 600 },
+      ],
+      colorTheme: '#3b82f6' // Blue
+    }
+  ]);
+  const [equipments, setEquipments] = useState<EquipmentData[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // History state for Undo/Redo
+  const [history, setHistory] = useState<AppState[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  // Quote Request Modal State
+  const [showQuoteModal, setShowQuoteModal] = useState(false);
+  const [quoteForm, setQuoteForm] = useState({
+    name: '',
+    phone: '',
+    region: '',
+    expectedDate: '미정'
+  });
+
+  const editorRef = useRef<EditorCanvasHandle>(null);
+
+  // Load from LocalStorage on mount
+  useEffect(() => {
+    if (isLoaded) return;
+    const savedStr = localStorage.getItem('pilates-floorplan-data');
+    let initRooms = rooms;
+    let initEquips = equipments;
+    if (savedStr) {
+      try {
+        const parsed = JSON.parse(savedStr);
+        if (parsed.rooms) initRooms = parsed.rooms;
+        if (parsed.equipments) initEquips = parsed.equipments;
+        setRooms(initRooms);
+        setEquipments(initEquips);
+      } catch (e) {
+        console.error('Failed to parse saved floorplan', e);
+      }
+    }
+    setHistory([{ rooms: initRooms, equipments: initEquips }]);
+    setHistoryIndex(0);
+    setIsLoaded(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Sync session data to form if available
+  useEffect(() => {
+    if (session?.user && showQuoteModal) {
+      setQuoteForm(prev => ({
+        ...prev,
+        name: prev.name || session.user?.name || '',
+        // NextAuth Kakao provider doesn't give phone by default without specific scope/business app,
+        // but we will autofill what we can.
+      }));
+    }
+  }, [session, showQuoteModal]);
+
+  // Auto-save to LocalStorage on changes
+  useEffect(() => {
+    if (!isLoaded) return;
+    localStorage.setItem('pilates-floorplan-data', JSON.stringify({ rooms, equipments }));
+  }, [rooms, equipments, isLoaded]);
+
+  const saveToHistory = useCallback((newState: AppState) => {
+    setHistory((prev) => {
+      const newHistory = prev.slice(0, historyIndex + 1);
+      newHistory.push(newState);
+      return newHistory;
+    });
+    setHistoryIndex((prev) => prev + 1);
+  }, [historyIndex]);
+
+  const undo = useCallback(() => {
+    if (historyIndex > 0) {
+      const prevState = history[historyIndex - 1];
+      setRooms(prevState.rooms);
+      setEquipments(prevState.equipments);
+      setHistoryIndex(historyIndex - 1);
+    }
+  }, [history, historyIndex]);
+
+  const redo = useCallback(() => {
+    if (historyIndex < history.length - 1) {
+      const nextState = history[historyIndex + 1];
+      setRooms(nextState.rooms);
+      setEquipments(nextState.equipments);
+      setHistoryIndex(historyIndex + 1);
+    }
+  }, [history, historyIndex]);
+
+  // Keyboard shortcuts for Undo/Redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        if (e.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        redo();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo]);
+
+  // Wrappers to update state and history
+  const updateRooms = (newRooms: RoomData[]) => {
+    setRooms(newRooms);
+    saveToHistory({ rooms: newRooms, equipments });
+  };
+
+  const updateEquipments = (newEquipments: EquipmentData[]) => {
+    setEquipments(newEquipments);
+    saveToHistory({ rooms, equipments: newEquipments });
+  };
+
+  const addRoom = () => {
+    const innerRoomCount = rooms.filter(r => r.type === 'inner').length + 1;
+    const newRoom: RoomData = {
+      id: `room-${Date.now()}`,
+      name: `룸 ${innerRoomCount}`,
+      type: 'inner',
+      points: [
+        { x: 300, y: 300 },
+        { x: 500, y: 300 },
+        { x: 500, y: 500 },
+        { x: 300, y: 500 },
+      ], // 4m x 4m default
+      colorTheme: '#f97316' // Orange
+    };
+    updateRooms([...rooms, newRoom]);
+  };
+
+  const addEquipment = (type: EquipmentType) => {
+    const newEq = {
+      id: `eq-${Date.now()}`,
+      type,
+      x: 300 + Math.random() * 50,
+      y: 300 + Math.random() * 50,
+      rotation: 0,
+    };
+    updateEquipments([...equipments, newEq]);
+  };
+
+  const removeEquipment = (id: string) => {
+    updateEquipments(equipments.filter(eq => eq.id !== id));
+    if (selectedId === id) setSelectedId(null);
+  };
+
+  const selectedEquipment = equipments.find(eq => eq.id === selectedId);
+
+  const handleEquipmentDimensionChange = (dimension: 'width' | 'height' | 'clearance', valueCm: number) => {
+    if (!selectedId) return;
+    // width and height are stored in px (1m = 100cm = 50px, so 1cm = 0.5px)
+    // clearance is stored in cm directly
+    const storeValue = dimension === 'clearance' ? valueCm : valueCm / 2;
+    
+    const newEquipments = equipments.map(eq => 
+      eq.id === selectedId ? { ...eq, [dimension]: storeValue } : eq
+    );
+    updateEquipments(newEquipments);
+  };
+
+  const handleEquipmentLabelChange = (label: string) => {
+    if (!selectedId) return;
+    const newEquipments = equipments.map(eq => 
+      eq.id === selectedId ? { ...eq, customLabel: label } : eq
+    );
+    updateEquipments(newEquipments);
+  };
+
+  const handleSubmitQuote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (status !== 'authenticated') {
+      alert('카카오 로그인이 필요합니다.');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/quotes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...quoteForm,
+          rooms,
+          equipments
+        })
+      });
+
+      if (res.ok) {
+        alert('성공적으로 견적 요청이 접수되었습니다!\n원장님이 그리신 도면을 바탕으로 제휴 인테리어 및 기구 업체가 최적의 견적서를 곧 발송해 드립니다.');
+        setShowQuoteModal(false);
+        setQuoteForm({ name: '', phone: '', region: '', expectedDate: '미정' });
+      } else {
+        alert('견적 요청 중 오류가 발생했습니다. 다시 시도해 주세요.');
+      }
+    } catch (error) {
+      console.error(error);
+      alert('서버와 통신할 수 없습니다.');
+    }
+  };
+
+  return (
+    <main style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column' }}>
+      {/* Top Navigation Bar */}
+      <header style={{ 
+        height: '60px', 
+        borderBottom: '1px solid #e5e7eb', 
+        display: 'flex', 
+        alignItems: 'center', 
+        padding: '0 24px',
+        background: 'white',
+        zIndex: 10,
+        boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+      }}>
+        <h1 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#111827', margin: 0 }}>
+          Pilates Space Optimizer
+        </h1>
+        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', gap: '8px' }}>
+          {/* Undo / Redo Buttons */}
+          <button 
+            onClick={undo}
+            disabled={historyIndex <= 0}
+            style={{
+              background: 'white',
+              border: '1px solid #e5e7eb',
+              padding: '6px 12px',
+              borderRadius: '6px',
+              cursor: historyIndex <= 0 ? 'not-allowed' : 'pointer',
+              opacity: historyIndex <= 0 ? 0.5 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontWeight: 500,
+              color: '#374151'
+            }}
+          >
+            ↩ 되돌리기
+          </button>
+          <button 
+            onClick={redo}
+            disabled={historyIndex >= history.length - 1}
+            style={{
+              background: 'white',
+              border: '1px solid #e5e7eb',
+              padding: '6px 12px',
+              borderRadius: '6px',
+              cursor: historyIndex >= history.length - 1 ? 'not-allowed' : 'pointer',
+              opacity: historyIndex >= history.length - 1 ? 0.5 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontWeight: 500,
+              color: '#374151'
+            }}
+          >
+            다시실행 ↪
+          </button>
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button 
+            onClick={() => setShowQuoteModal(true)}
+            style={{
+              background: '#f97316', // Orange
+              color: 'white',
+              border: 'none',
+              padding: '8px 16px',
+              borderRadius: '6px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              boxShadow: '0 2px 4px rgba(249, 115, 22, 0.2)'
+            }}>
+            🚀 인테리어/기구 비교 견적 받기
+          </button>
+          <button 
+            onClick={() => {
+              const fileName = window.prompt('저장할 도면의 이름을 입력해주세요 (확장자 제외):', '내-필라테스-도면');
+              if (fileName !== null) {
+                const finalName = fileName.trim() === '' ? `pilates-floorplan-${Date.now()}` : fileName.trim();
+                editorRef.current?.downloadImage(finalName);
+              }
+            }}
+            style={{
+              background: '#111827',
+              color: 'white',
+              border: 'none',
+              padding: '8px 16px',
+              borderRadius: '6px',
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}>
+            도면 저장 (PNG)
+          </button>
+        </div>
+      </header>
+
+      {/* Main Editor Area */}
+      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+        {/* Toolbar (Left) */}
+        <aside style={{
+          position: 'absolute',
+          top: 24,
+          left: 24,
+          width: '240px',
+          background: 'white',
+          borderRadius: '8px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+          padding: '16px',
+          zIndex: 10,
+          border: '1px solid #f3f4f6'
+        }}>
+          <h2 style={{ fontSize: '0.875rem', fontWeight: 600, color: '#6b7280', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            도구 (Tools)
+          </h2>
+          
+          <button 
+            onClick={() => {
+              if (window.confirm('기존 도면과 배치된 기구가 모두 초기화됩니다. 처음부터 다시 그리시겠습니까?')) {
+                // Reset to default outer wall
+                updateRooms([
+                  {
+                    id: `outer-${Date.now()}`,
+                    name: '전체 외벽',
+                    type: 'outer',
+                    points: [
+                      { x: 100, y: 100 },
+                      { x: 600, y: 100 },
+                      { x: 600, y: 600 },
+                      { x: 100, y: 600 },
+                    ],
+                    colorTheme: '#3b82f6'
+                  }
+                ]);
+                updateEquipments([]);
+              }
+            }}
+            style={{ display: 'block', width: '100%', padding: '10px', textAlign: 'left', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', marginBottom: '8px', cursor: 'pointer', fontWeight: 500, color: '#374151' }}
+          >
+            🔄 전체 초기화 (다시 그리기)
+          </button>
+          <button 
+            onClick={addRoom}
+            style={{ display: 'block', width: '100%', padding: '10px', textAlign: 'left', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', marginBottom: '24px', cursor: 'pointer', fontWeight: 500, color: '#374151' }}
+          >
+            + 룸(Room) 추가
+          </button>
+
+          {selectedEquipment && (
+            <>
+              <div style={{ margin: '24px 0', borderTop: '1px solid #e5e7eb' }} />
+              <h2 style={{ fontSize: '0.875rem', fontWeight: 600, color: '#6b7280', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                선택된 기구 설정
+              </h2>
+              <div style={{ background: '#f9fafb', padding: '16px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                <div style={{ fontWeight: 600, marginBottom: '12px', color: '#111827', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>{selectedEquipment.type === 'Custom' ? '기타 가구/기구' : selectedEquipment.type} 설정</span>
+                  <button onClick={() => setSelectedId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '16px' }}>&times;</button>
+                </div>
+                
+                {selectedEquipment.type === 'Custom' && (
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', fontSize: '12px', color: '#4b5563', marginBottom: '4px' }}>이름 (Label)</label>
+                    <input 
+                      type="text" 
+                      value={selectedEquipment.customLabel || ''}
+                      placeholder="예: 탈의실 락커, 상담테이블"
+                      onChange={(e) => handleEquipmentLabelChange(e.target.value)}
+                      style={{ width: '100%', padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '14px', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '12px', marginBottom: '8px' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', fontSize: '12px', color: '#4b5563', marginBottom: '4px' }}>가로 (cm)</label>
+                    <input 
+                      type="number" 
+                      value={Math.round((selectedEquipment.width || EQUIPMENT_DIMS[selectedEquipment.type].width) * 2)}
+                      onChange={(e) => handleEquipmentDimensionChange('width', Number(e.target.value))}
+                      style={{ width: '100%', padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '14px', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', fontSize: '12px', color: '#4b5563', marginBottom: '4px' }}>세로 (cm)</label>
+                    <input 
+                      type="number" 
+                      value={Math.round((selectedEquipment.height || EQUIPMENT_DIMS[selectedEquipment.type].height) * 2)}
+                      onChange={(e) => handleEquipmentDimensionChange('height', Number(e.target.value))}
+                      style={{ width: '100%', padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '14px', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                </div>
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#4b5563', marginBottom: '4px' }}>여유 공간 (cm)</label>
+                  <input 
+                    type="number" 
+                    value={selectedEquipment.clearance ?? 40}
+                    onChange={(e) => handleEquipmentDimensionChange('clearance', Number(e.target.value))}
+                    style={{ width: '100%', padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '14px', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <p style={{ fontSize: '11px', color: '#6b7280', margin: 0, lineHeight: 1.4 }}>
+                  실제 기구의 치수(cm)를 입력하시면 도면에 정확한 비율로 반영됩니다.
+                </p>
+                <button 
+                  onClick={() => removeEquipment(selectedEquipment.id)}
+                  style={{ marginTop: '12px', width: '100%', padding: '8px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  🗑️ 삭제
+                </button>
+              </div>
+            </>
+          )}
+          
+          <div style={{ margin: '24px 0', borderTop: '1px solid #e5e7eb' }} />
+          
+          <h2 style={{ fontSize: '0.875rem', fontWeight: 600, color: '#6b7280', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            기구 (Equipment)
+          </h2>
+          <button onClick={() => addEquipment('Reformer')} style={{ display: 'block', width: '100%', padding: '10px', textAlign: 'left', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', marginBottom: '8px', cursor: 'pointer', fontWeight: 500, color: '#374151' }}>
+            🛏️ 리포머 (Reformer)
+          </button>
+          <button onClick={() => addEquipment('Cadillac')} style={{ display: 'block', width: '100%', padding: '10px', textAlign: 'left', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', marginBottom: '8px', cursor: 'pointer', fontWeight: 500, color: '#374151' }}>
+            🏗️ 캐딜락 (Cadillac)
+          </button>
+          <button onClick={() => addEquipment('Chair')} style={{ display: 'block', width: '100%', padding: '10px', textAlign: 'left', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', marginBottom: '8px', cursor: 'pointer', fontWeight: 500, color: '#374151' }}>
+            🪑 체어 (Chair)
+          </button>
+          <button onClick={() => addEquipment('Barrel')} style={{ display: 'block', width: '100%', padding: '10px', textAlign: 'left', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', marginBottom: '8px', cursor: 'pointer', fontWeight: 500, color: '#374151' }}>
+            🛢️ 바렐 (Barrel)
+          </button>
+          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+            <button 
+              onClick={() => addEquipment('Custom')}
+              style={{ flex: 1, padding: '8px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 500, color: '#4b5563' }}>
+              + 가구(커스텀) 생성
+            </button>
+            <button 
+              onClick={() => addEquipment('Door')}
+              style={{ flex: 1, padding: '8px', background: '#e0e7ff', border: '1px solid #c7d2fe', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 500, color: '#4338ca' }}>
+              + 출입문 생성
+            </button>
+          </div>
+        </aside>
+
+        {/* Canvas Area */}
+        <Editor 
+          editorRef={editorRef}
+          equipments={equipments} 
+          setEquipments={updateEquipments} 
+          rooms={rooms}
+          setRooms={updateRooms}
+          selectedId={selectedId}
+          setSelectedId={setSelectedId}
+        />
+      </div>
+
+      {/* Tutorial Overlay */}
+      {showTutorial && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.6)',
+          zIndex: 100,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backdropFilter: 'blur(4px)'
+        }}>
+          <div style={{
+            background: 'white',
+            padding: '40px',
+            borderRadius: '16px',
+            maxWidth: '500px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+            textAlign: 'center'
+          }}>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#111827', marginBottom: '16px' }}>
+              환영합니다! 👋
+            </h2>
+            <p style={{ color: '#4b5563', marginBottom: '24px', lineHeight: '1.6' }}>
+              우리 상가에 딱 맞는 필라테스 공간을 직접 설계해 보세요.<br/><br/>
+              <b>💡 꿀팁: 다각형 공간 만들기</b><br/>
+              파란색 선 중간에 있는 <b>반투명한 동그라미</b>를 클릭하면 모서리가 추가됩니다. 기둥이나 꺾인 복도 형태를 쉽게 만들어보세요!<br/><br/>
+              <b>🛏️ 기구 배치하기</b><br/>
+              좌측 패널에서 기구를 추가하고 드래그하여 배치하세요. 기구를 클릭하면 회전도 가능합니다.
+            </p>
+            <button 
+              onClick={() => setShowTutorial(false)}
+              style={{
+                background: '#3b82f6',
+                color: 'white',
+                border: 'none',
+                padding: '12px 32px',
+                borderRadius: '8px',
+                fontWeight: 600,
+                fontSize: '1rem',
+                cursor: 'pointer',
+                transition: 'background 0.2s'
+              }}
+            >
+              시작하기
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Quote Request Modal */}
+      {showQuoteModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.6)',
+          zIndex: 200,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backdropFilter: 'blur(4px)'
+        }}>
+          <div style={{
+            background: 'white',
+            padding: '32px',
+            borderRadius: '16px',
+            width: '400px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+          }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#111827', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
+              <span>🚀 무료 비교 견적 요청</span>
+              <button onClick={() => setShowQuoteModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', color: '#9ca3af' }}>&times;</button>
+            </h2>
+            <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '24px', lineHeight: 1.5 }}>
+              지금 그리신 도면을 바탕으로 <b>가장 저렴하고 확실한</b> 인테리어 및 기구 견적을 받아보세요.
+            </p>
+
+            {status !== 'authenticated' ? (
+              <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                <p style={{ fontSize: '14px', color: '#4b5563', marginBottom: '16px' }}>
+                  정확한 견적서 발송을 위해 카카오 로그인이 필요합니다.
+                </p>
+                <button
+                  onClick={() => signIn('kakao')}
+                  style={{
+                    width: '100%',
+                    background: '#FEE500',
+                    color: '#000000',
+                    border: 'none',
+                    padding: '14px',
+                    borderRadius: '8px',
+                    fontWeight: 700,
+                    fontSize: '1rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  <span style={{ fontSize: '1.2rem' }}>💬</span> 카카오로 3초 만에 시작하기
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmitQuote}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '12px', color: '#4b5563', marginBottom: '4px', fontWeight: 600 }}>성함 (또는 상호명) <span style={{color: '#ef4444'}}>*</span></label>
+                <input 
+                  type="text" 
+                  required
+                  value={quoteForm.name} 
+                  onChange={e => setQuoteForm({...quoteForm, name: e.target.value})} 
+                  placeholder="예: 홍길동 원장"
+                  style={{ width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }} 
+                />
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '12px', color: '#4b5563', marginBottom: '4px', fontWeight: 600 }}>
+                  연락처 <span style={{color: '#ef4444'}}>*</span>
+                </label>
+                <input 
+                  type="tel" 
+                  required
+                  value={quoteForm.phone} 
+                  onChange={e => setQuoteForm({...quoteForm, phone: e.target.value})} 
+                  placeholder="010-1234-5678"
+                  style={{ width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }} 
+                />
+                <p style={{fontSize: '11px', color: '#3b82f6', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px'}}>
+                  💡 추후 이 단계는 '카카오 간편 1초 로그인'으로 자동화됩니다.
+                </p>
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '12px', color: '#4b5563', marginBottom: '4px', fontWeight: 600 }}>오픈 예정 지역 <span style={{color: '#ef4444'}}>*</span></label>
+                <input 
+                  type="text" 
+                  required
+                  value={quoteForm.region} 
+                  onChange={e => setQuoteForm({...quoteForm, region: e.target.value})} 
+                  placeholder="예: 서울 강남구 역삼동"
+                  style={{ width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }} 
+                />
+              </div>
+
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{ display: 'block', fontSize: '12px', color: '#4b5563', marginBottom: '4px', fontWeight: 600 }}>오픈 예정 시기</label>
+                <select 
+                  value={quoteForm.expectedDate} 
+                  onChange={e => setQuoteForm({...quoteForm, expectedDate: e.target.value})} 
+                  style={{ width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }}>
+                  <option value="1개월 이내">1개월 이내 (매우 급함)</option>
+                  <option value="3개월 이내">3개월 이내</option>
+                  <option value="6개월 이내">6개월 이내</option>
+                  <option value="미정">미정 (알아보는 중)</option>
+                </select>
+              </div>
+
+              <button 
+                type="submit"
+                style={{
+                  width: '100%',
+                  background: '#f97316',
+                  color: 'white',
+                  border: 'none',
+                  padding: '14px',
+                  borderRadius: '8px',
+                  fontWeight: 700,
+                  fontSize: '1rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 6px -1px rgba(249, 115, 22, 0.2)'
+                }}
+              >
+                도면 전송 및 무료 견적 받기
+              </button>
+            </form>
+            )}
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}
