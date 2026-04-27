@@ -4,6 +4,7 @@ import Editor from '@/components/Editor';
 import { EditorCanvasHandle } from '@/components/Editor/EditorCanvas';
 import { EquipmentData, EquipmentType, EQUIPMENT_DIMS } from '@/components/Editor/Equipment';
 import { useSession, signIn } from 'next-auth/react';
+import styles from './page.module.css';
 
 export type Point = { x: number; y: number };
 
@@ -240,24 +241,16 @@ export default function Home() {
   };
 
   return (
-    <main style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <main className={styles.layout}>
       {/* Top Navigation Bar */}
-      <header style={{ 
-        height: '60px', 
-        borderBottom: '1px solid #e5e7eb', 
-        display: 'flex', 
-        alignItems: 'center', 
-        padding: '0 24px',
-        background: 'white',
-        zIndex: 10,
-        boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
-      }}>
-        <h1 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#111827', margin: 0 }}>
+      <header className={styles.header}>
+        <h1 className={styles.headerTitle}>
           Pilates Space Optimizer
         </h1>
         <div style={{ flex: 1, display: 'flex', justifyContent: 'center', gap: '8px' }}>
           {/* Undo / Redo Buttons */}
           <button 
+            className={styles.headerButton}
             onClick={undo}
             disabled={historyIndex <= 0}
             style={{
@@ -277,6 +270,7 @@ export default function Home() {
             ↩ 되돌리기
           </button>
           <button 
+            className={styles.headerButton}
             onClick={redo}
             disabled={historyIndex >= history.length - 1}
             style={{
@@ -298,6 +292,7 @@ export default function Home() {
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button 
+            className={styles.headerButton}
             onClick={() => setShowQuoteModal(true)}
             style={{
               background: '#f97316', // Orange
@@ -312,6 +307,7 @@ export default function Home() {
             🚀 인테리어/기구 비교 견적 받기
           </button>
           <button 
+            className={styles.headerButton}
             onClick={() => {
               const fileName = window.prompt('저장할 도면의 이름을 입력해주세요 (확장자 제외):', '내-필라테스-도면');
               if (fileName !== null) {
@@ -334,25 +330,15 @@ export default function Home() {
       </header>
 
       {/* Main Editor Area */}
-      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+      <div className={styles.editorArea}>
         {/* Toolbar (Left) */}
-        <aside style={{
-          position: 'absolute',
-          top: 24,
-          left: 24,
-          width: '240px',
-          background: 'white',
-          borderRadius: '8px',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-          padding: '16px',
-          zIndex: 10,
-          border: '1px solid #f3f4f6'
-        }}>
-          <h2 style={{ fontSize: '0.875rem', fontWeight: 600, color: '#6b7280', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            도구 (Tools)
-          </h2>
-          
-          <button 
+        <aside className={styles.toolbar}>
+          <div className={styles.toolSection}>
+            <h2 style={{ fontSize: '0.875rem', fontWeight: 600, color: '#6b7280', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              도구 (Tools)
+            </h2>
+            <div className={styles.toolsGrid}>
+              <button 
             onClick={() => {
               if (window.confirm('기존 도면과 배치된 기구가 모두 초기화됩니다. 처음부터 다시 그리시겠습니까?')) {
                 // Reset to default outer wall
@@ -383,6 +369,8 @@ export default function Home() {
           >
             + 룸(Room) 추가
           </button>
+            </div>
+          </div>
 
           {selectedEquipment && (
             <>
@@ -453,10 +441,12 @@ export default function Home() {
           
           <div style={{ margin: '24px 0', borderTop: '1px solid #e5e7eb' }} />
           
-          <h2 style={{ fontSize: '0.875rem', fontWeight: 600, color: '#6b7280', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            기구 (Equipment)
-          </h2>
-          <button onClick={() => addEquipment('Reformer')} style={{ display: 'block', width: '100%', padding: '10px', textAlign: 'left', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', marginBottom: '8px', cursor: 'pointer', fontWeight: 500, color: '#374151' }}>
+          <div className={styles.toolSection}>
+            <h2 style={{ fontSize: '0.875rem', fontWeight: 600, color: '#6b7280', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              기구 (Equipment)
+            </h2>
+            <div className={styles.toolsGrid}>
+              <button onClick={() => addEquipment('Reformer')} style={{ display: 'block', width: '100%', padding: '10px', textAlign: 'left', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', marginBottom: '8px', cursor: 'pointer', fontWeight: 500, color: '#374151' }}>
             🛏️ 리포머 (Reformer)
           </button>
           <button onClick={() => addEquipment('Cadillac')} style={{ display: 'block', width: '100%', padding: '10px', textAlign: 'left', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', marginBottom: '8px', cursor: 'pointer', fontWeight: 500, color: '#374151' }}>
@@ -479,6 +469,8 @@ export default function Home() {
               style={{ flex: 1, padding: '8px', background: '#e0e7ff', border: '1px solid #c7d2fe', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 500, color: '#4338ca' }}>
               + 출입문 생성
             </button>
+            </div>
+            </div>
           </div>
         </aside>
 

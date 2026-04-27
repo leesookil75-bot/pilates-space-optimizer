@@ -33,6 +33,10 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
 
+  // Touch zoom state
+  const lastCenter = useRef<{x: number, y: number} | null>(null);
+  const lastDist = useRef<number>(0);
+
   const checkDeselect = (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
     // deselect when clicked on empty area or grid
     const clickedOnEmpty = e.target === e.target.getStage();
@@ -99,6 +103,82 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
     });
   }, []);
 
+  // Handle pinch-to-zoom (touch)
+  const handleTouchMove = useCallback((e: KonvaEventObject<TouchEvent>) => {
+    e.evt.preventDefault();
+    const touch1 = e.evt.touches[0];
+    const touch2 = e.evt.touches[1];
+
+    if (touch1 && touch2) {
+      const stage = stageRef.current;
+      if (!stage) return;
+
+      if (stage.isDragging()) {
+        stage.stopDrag();
+      }
+
+      const p1 = { x: touch1.clientX, y: touch1.clientY };
+      const p2 = { x: touch2.clientX, y: touch2.clientY };
+
+      const dist = Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+
+      if (!lastDist.current) {
+        lastDist.current = dist;
+      }
+
+      const center = {
+        x: (p1.x + p2.x) / 2,
+        y: (p1.y + p2.y) / 2,
+      };
+
+      if (!lastCenter.current) {
+        lastCenter.current = center;
+        return;
+      }
+
+      const oldScale = stage.scaleX();
+      const scaleBy = dist / lastDist.current;
+      const newScale = oldScale * scaleBy;
+
+      if (newScale < 0.1 || newScale > 10) {
+        lastDist.current = dist;
+        lastCenter.current = center;
+        return;
+      }
+
+      // calculate pointer position relative to stage
+      // Note: touch positions are relative to viewport. We need to account for container position if it's not full screen, 
+      // but assuming the container is full screen or using clientX/Y directly for scale is close enough for relative movement.
+      // A more robust way is to use stage.getPointerPosition() if it was correctly updated, but Konva might not update it on multitouch perfectly.
+      // We will use standard Konva math:
+      
+      const containerRect = containerRef.current?.getBoundingClientRect();
+      const stageCenterX = containerRect ? center.x - containerRect.left : center.x;
+      const stageCenterY = containerRect ? center.y - containerRect.top : center.y;
+
+      const mousePointTo = {
+        x: stageCenterX / oldScale - stage.x() / oldScale,
+        y: stageCenterY / oldScale - stage.y() / oldScale,
+      };
+
+      const newPos = {
+        x: stageCenterX - mousePointTo.x * newScale + (center.x - lastCenter.current.x),
+        y: stageCenterY - mousePointTo.y * newScale + (center.y - lastCenter.current.y),
+      };
+
+      setScale(newScale);
+      setPosition(newPos);
+
+      lastDist.current = dist;
+      lastCenter.current = center;
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    lastDist.current = 0;
+    lastCenter.current = null;
+  }, []);
+
   return (
     <div ref={containerRef} style={{ width: '100%', height: '100%', background: '#fafafa' }}>
       {stageSize.width > 0 && (
@@ -113,6 +193,8 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
           onWheel={handleWheel}
           onMouseDown={checkDeselect}
           onTouchStart={checkDeselect}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
           draggable
           onDragEnd={(e) => {
             // Only update if it's the stage being dragged, not an equipment

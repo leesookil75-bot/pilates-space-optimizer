@@ -140,3 +140,113 @@ a.secondary {
     --button-secondary-border: #1a1a1a;
   }
 }
+
+/* 
+ * Layout Classes for Editor 
+ */
+.layout {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  height: 60px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  background: white;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+
+.headerTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.editorArea {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.toolbar {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  width: 240px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  padding: 16px;
+  z-index: 10;
+  border: 1px solid #f3f4f6;
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+}
+
+.toolSection {
+  margin-bottom: 24px;
+}
+
+/* Mobile Overrides */
+@media (max-width: 768px) {
+  .header {
+    padding: 0 12px;
+    height: 54px;
+  }
+  
+  .headerTitle {
+    display: none; /* Hide title on mobile to save space */
+  }
+
+  .editorArea {
+    /* Leave space for bottom toolbar */
+    height: calc(100vh - 54px);
+  }
+
+  .toolbar {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    width: 100vw;
+    border-radius: 16px 16px 0 0;
+    padding: 12px 16px;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+    max-height: 40vh;
+    display: flex;
+    flex-direction: column;
+    z-index: 20;
+  }
+
+  .toolSection {
+    margin-bottom: 12px;
+  }
+
+  .toolsGrid {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 8px;
+    padding-bottom: 8px;
+  }
+
+  .toolsGrid > button, .toolsGrid > div {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    margin-bottom: 0 !important;
+  }
+
+  /* Make header buttons smaller on mobile */
+  .headerButton {
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+  }
+}
