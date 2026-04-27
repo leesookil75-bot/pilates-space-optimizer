@@ -316,25 +316,58 @@ export default function Home() {
         </h1>
         <div style={{ flex: 1, display: 'flex', justifyContent: 'center', gap: '8px' }}>
           {/* Undo / Redo Buttons */}
-          <div className={styles.actionGroup}>
-            <button 
-              className={styles.iconButton}
-              onClick={undo}
-              disabled={historyIndex <= 0}
-              title="실행 취소 (Ctrl+Z)"
-            >
-              <span style={{ fontSize: '1.25rem', opacity: historyIndex <= 0 ? 0.3 : 1 }}>↩️</span>
-              <span style={{ fontSize: '0.7rem', color: '#6b7280', marginTop: '2px', fontWeight: 600 }}>취소</span>
-            </button>
-            <button 
-              className={styles.iconButton}
-              onClick={redo}
-              disabled={historyIndex >= history.length - 1}
-              title="다시 실행 (Ctrl+Y)"
-            >
-              <span style={{ fontSize: '1.25rem', opacity: historyIndex >= history.length - 1 ? 0.3 : 1 }}>↪️</span>
-              <span style={{ fontSize: '0.7rem', color: '#6b7280', marginTop: '2px', fontWeight: 600 }}>재실행</span>
-            </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', gap: '4px', background: '#f3f4f6', padding: '4px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+              <button 
+                onClick={undo}
+                disabled={historyIndex <= 0}
+                title="실행 취소 (Ctrl+Z)"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 16px',
+                  borderRadius: '6px',
+                  background: historyIndex <= 0 ? 'transparent' : 'white',
+                  border: historyIndex <= 0 ? '1px solid transparent' : '1px solid #d1d5db',
+                  color: historyIndex <= 0 ? '#9ca3af' : '#111827',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  cursor: historyIndex <= 0 ? 'not-allowed' : 'pointer',
+                  boxShadow: historyIndex <= 0 ? 'none' : '0 1px 2px rgba(0,0,0,0.05)',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <span style={{ fontSize: '16px' }}>↩</span>
+                <span className={styles.desktopOnly}>실행 취소</span>
+                <span className={styles.mobileOnly}>취소</span>
+              </button>
+              
+              <button 
+                onClick={redo}
+                disabled={historyIndex >= history.length - 1}
+                title="다시 실행 (Ctrl+Y)"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 16px',
+                  borderRadius: '6px',
+                  background: historyIndex >= history.length - 1 ? 'transparent' : 'white',
+                  border: historyIndex >= history.length - 1 ? '1px solid transparent' : '1px solid #d1d5db',
+                  color: historyIndex >= history.length - 1 ? '#9ca3af' : '#111827',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  cursor: historyIndex >= history.length - 1 ? 'not-allowed' : 'pointer',
+                  boxShadow: historyIndex >= history.length - 1 ? 'none' : '0 1px 2px rgba(0,0,0,0.05)',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <span style={{ fontSize: '16px' }}>↪</span>
+                <span className={styles.desktopOnly}>다시 실행</span>
+                <span className={styles.mobileOnly}>복구</span>
+              </button>
+            </div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
