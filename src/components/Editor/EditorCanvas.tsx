@@ -206,7 +206,7 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
   }, []);
 
   return (
-    <div ref={containerRef} style={{ width: '100%', height: '100%', background: '#fafafa' }}>
+    <div ref={containerRef} style={{ width: '100%', height: '100%', background: '#fafafa', touchAction: 'none' }}>
       {stageSize.width > 0 && (
         <Stage
           ref={stageRef}
