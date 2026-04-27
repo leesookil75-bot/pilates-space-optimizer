@@ -8,6 +8,7 @@ interface FloorPlanProps {
   hasInnerRooms?: boolean;
   onChange: (newPoints: Point[]) => void;
   scale: number;
+  readOnly?: boolean;
 }
 
 const getSnapSize = (scale: number) => {
@@ -22,7 +23,7 @@ const snapToGrid = (val: number, scale: number) => {
   return Math.round(val / snapSize) * snapSize;
 };
 
-export default function FloorPlan({ room, hasInnerRooms = false, onChange, scale }: FloorPlanProps) {
+export default function FloorPlan({ room, hasInnerRooms = false, onChange, scale, readOnly = false }: FloorPlanProps) {
   const points = room.points;
   const isOuter = room.type === 'outer';
   const colorTheme = room.colorTheme;
@@ -153,13 +154,15 @@ export default function FloorPlan({ room, hasInnerRooms = false, onChange, scale
           fill="#ffffff"
           stroke={strokeColor}
           strokeWidth={2 / scale}
-          draggable
+          draggable={!readOnly}
           onDragMove={(e) => handleDragMove(index, e)}
           onMouseEnter={() => {
+            if (readOnly) return;
             setHoveredPoint(index);
             document.body.style.cursor = 'move';
           }}
           onMouseLeave={() => {
+            if (readOnly) return;
             setHoveredPoint(null);
             document.body.style.cursor = 'grab';
           }}

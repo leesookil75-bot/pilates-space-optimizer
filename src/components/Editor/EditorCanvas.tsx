@@ -16,13 +16,14 @@ interface EditorCanvasProps {
   selectedId: string | null;
   setSelectedId: (id: string | null) => void;
   editorRef?: React.RefObject<EditorCanvasHandle | null>;
+  readOnly?: boolean;
 }
 
 export interface EditorCanvasHandle {
   downloadImage: (fileName?: string) => void;
 }
 
-export default function EditorCanvas({ equipments, setEquipments, rooms, setRooms, selectedId, setSelectedId, editorRef }: EditorCanvasProps) {
+export default function EditorCanvas({ equipments, setEquipments, rooms, setRooms, selectedId, setSelectedId, editorRef, readOnly = false }: EditorCanvasProps) {
   const stageRef = useRef<Konva.Stage>(null);
   
   // Responsive stage sizing
@@ -290,16 +291,19 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
                   newRooms[index] = { ...room, points: newPoints };
                   setRooms(newRooms);
                 }} 
-                scale={scale} 
+                scale={scale}
+                readOnly={readOnly}
               />
             ))}
             {/* Equipment Layer */}
             {equipments.map((eq, i) => (
               <Equipment
                 key={eq.id}
-                data={eq}
-                isSelected={eq.id === selectedId}
-                onSelect={() => setSelectedId(eq.id)}
+                data={readOnly ? { ...eq, isLocked: true } : eq}
+                isSelected={!readOnly && eq.id === selectedId}
+                onSelect={() => {
+                  if (!readOnly) setSelectedId(eq.id);
+                }}
                 onChange={(newAttrs) => {
                   const eqs = equipments.slice();
                   eqs[i] = newAttrs;
