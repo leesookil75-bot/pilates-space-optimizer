@@ -179,6 +179,62 @@ a.secondary {
   white-space: nowrap;
 }
 
+.logoArea {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.logoIcon {
+  width: 24px;
+  height: 24px;
+  background: #f97316;
+  border-radius: 6px;
+}
+
+.title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.actionGroup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.iconButton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.iconButton:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+
+.iconButton:disabled {
+  cursor: not-allowed;
+}
+
+.divider {
+  width: 1px;
+  height: 24px;
+  background: #e5e7eb;
+  margin: 0 4px;
+}
+
 .editorArea {
   flex: 1;
   position: relative;
