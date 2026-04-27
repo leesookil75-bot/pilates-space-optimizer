@@ -32,6 +32,7 @@ export async function POST(req: Request) {
       equipments: equipments || [],
       userEmail: session?.user?.email || null,
       userName: session?.user?.name || null,
+      status: '신규 접수',
       createdAt: new Date().toISOString(),
     };
 

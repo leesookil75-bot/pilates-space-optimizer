@@ -42,6 +42,54 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleStatusChange = async (id: string, newStatus: string) => {
+    try {
+      const res = await fetch('/api/admin/quotes/update-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, id, status: newStatus })
+      });
+      if (res.ok) {
+        setQuotes(prev => prev.map(q => q.id === id ? { ...q, status: newStatus } : q));
+      } else {
+        alert('상태 업데이트 실패');
+      }
+    } catch (error) {
+      alert('상태 업데이트 오류');
+    }
+  };
+
+  const summarizeEquipments = (equipments: any[]) => {
+    if (!equipments || equipments.length === 0) return '-';
+    const counts = equipments.reduce((acc: any, eq: any) => {
+      let label = eq.type;
+      if (label === 'Reformer') label = '리포머';
+      if (label === 'Cadillac') label = '캐딜락';
+      if (label === 'Chair') label = '체어';
+      if (label === 'Barrel') label = '바렐';
+      if (label === 'Custom') label = eq.customLabel || '가구';
+      if (label === 'Door') label = '출입문';
+      acc[label] = (acc[label] || 0) + 1;
+      return acc;
+    }, {});
+    const summary = Object.entries(counts)
+      .filter(([key]) => key !== '출입문' && key !== '가구')
+      .map(([key, count]) => `${key} ${count}대`)
+      .join(', ');
+    return summary || '-';
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case '신규 접수': return { bg: '#dbeafe', color: '#1e40af' };
+      case '제휴사 전달완료': return { bg: '#fef08a', color: '#854d0e' };
+      case '상담 진행 중': return { bg: '#ffedd5', color: '#c2410c' };
+      case '계약 완료': return { bg: '#dcfce3', color: '#166534' };
+      case '보류/취소': return { bg: '#f3f4f6', color: '#4b5563' };
+      default: return { bg: '#f3f4f6', color: '#4b5563' };
+    }
+  };
+
   if (!isAuthenticated) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#f3f4f6' }}>
@@ -73,7 +121,7 @@ export default function AdminDashboard() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f9fafb', padding: '32px' }}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+      <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <h1 style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#111827' }}>👑 견적 요청 관리자 대시보드</h1>
           <button 
@@ -89,35 +137,69 @@ export default function AdminDashboard() {
             <thead style={{ background: '#f3f4f6' }}>
               <tr>
                 <th style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontSize: '14px' }}>접수 일시</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontSize: '14px' }}>진행 상태</th>
                 <th style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontSize: '14px' }}>성함/상호</th>
                 <th style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontSize: '14px' }}>연락처</th>
-                <th style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontSize: '14px' }}>오픈 예정 지역</th>
-                <th style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontSize: '14px' }}>오픈 시기</th>
-                <th style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontSize: '14px' }}>도면</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontSize: '14px' }}>오픈 지역 / 시기</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontSize: '14px' }}>필요 기구</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontSize: '14px' }}>도면 보기</th>
               </tr>
             </thead>
             <tbody>
               {quotes.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>접수된 견적 요청이 없습니다.</td>
+                  <td colSpan={7} style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>접수된 견적 요청이 없습니다.</td>
                 </tr>
-              ) : quotes.map(q => (
+              ) : quotes.map(q => {
+                const status = q.status || '신규 접수';
+                const statusColor = getStatusColor(status);
+                return (
                 <tr key={q.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                  <td style={{ padding: '16px', color: '#111827', fontSize: '14px' }}>{new Date(q.createdAt).toLocaleString()}</td>
+                  <td style={{ padding: '16px', color: '#111827', fontSize: '14px' }}>{new Date(q.createdAt).toLocaleDateString()} {new Date(q.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                  <td style={{ padding: '16px' }}>
+                    <select 
+                      value={status}
+                      onChange={(e) => handleStatusChange(q.id, e.target.value)}
+                      style={{ 
+                        padding: '6px 12px', 
+                        borderRadius: '20px', 
+                        border: 'none', 
+                        fontSize: '13px', 
+                        fontWeight: 'bold', 
+                        cursor: 'pointer',
+                        background: statusColor.bg,
+                        color: statusColor.color,
+                        outline: 'none',
+                        appearance: 'none',
+                        WebkitAppearance: 'none'
+                      }}
+                    >
+                      <option value="신규 접수">🟢 신규 접수</option>
+                      <option value="제휴사 전달완료">🟡 제휴사 전달완료</option>
+                      <option value="상담 진행 중">🟠 상담 진행 중</option>
+                      <option value="계약 완료">🔵 계약 완료</option>
+                      <option value="보류/취소">⚫ 보류/취소</option>
+                    </select>
+                  </td>
                   <td style={{ padding: '16px', color: '#111827', fontWeight: 500 }}>{q.name}</td>
                   <td style={{ padding: '16px', color: '#111827' }}>{q.phone}</td>
-                  <td style={{ padding: '16px', color: '#111827' }}>{q.region}</td>
-                  <td style={{ padding: '16px', color: '#6b7280' }}>{q.expectedDate}</td>
+                  <td style={{ padding: '16px', color: '#111827' }}>
+                    <div>{q.region}</div>
+                    <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>{q.expectedDate}</div>
+                  </td>
+                  <td style={{ padding: '16px', color: '#111827', fontSize: '13px', maxWidth: '250px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={summarizeEquipments(q.equipments)}>
+                    {summarizeEquipments(q.equipments)}
+                  </td>
                   <td style={{ padding: '16px' }}>
                     <button 
                       onClick={() => setViewingQuote(q)}
                       style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
                     >
-                      도면 보기
+                      도면 열기
                     </button>
                   </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         </div>

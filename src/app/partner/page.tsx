@@ -46,6 +46,37 @@ export default function PartnerDashboard() {
     alert('이 기능은 실제 서비스 오픈 시 과금(또는 포인트 차감) 후 고객의 원본 연락처를 열람할 수 있는 기능입니다. 현재는 테스트 모드입니다.');
   };
 
+  const summarizeEquipments = (equipments: any[]) => {
+    if (!equipments || equipments.length === 0) return '-';
+    const counts = equipments.reduce((acc: any, eq: any) => {
+      let label = eq.type;
+      if (label === 'Reformer') label = '리포머';
+      if (label === 'Cadillac') label = '캐딜락';
+      if (label === 'Chair') label = '체어';
+      if (label === 'Barrel') label = '바렐';
+      if (label === 'Custom') label = eq.customLabel || '가구';
+      if (label === 'Door') label = '출입문';
+      acc[label] = (acc[label] || 0) + 1;
+      return acc;
+    }, {});
+    const summary = Object.entries(counts)
+      .filter(([key]) => key !== '출입문' && key !== '가구')
+      .map(([key, count]) => `${key} ${count}대`)
+      .join(', ');
+    return summary || '-';
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case '신규 접수': return <span style={{ background: '#dbeafe', color: '#1e40af', padding: '4px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}>🟢 신규 접수</span>;
+      case '제휴사 전달완료': return <span style={{ background: '#fef08a', color: '#854d0e', padding: '4px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}>🟡 대기 중</span>;
+      case '상담 진행 중': return <span style={{ background: '#ffedd5', color: '#c2410c', padding: '4px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}>🟠 상담 중</span>;
+      case '계약 완료': return <span style={{ background: '#dcfce3', color: '#166534', padding: '4px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}>🔵 계약 마감</span>;
+      case '보류/취소': return <span style={{ background: '#f3f4f6', color: '#4b5563', padding: '4px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}>⚫ 보류/취소</span>;
+      default: return <span style={{ background: '#dbeafe', color: '#1e40af', padding: '4px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}>🟢 신규 접수</span>;
+    }
+  };
+
   if (!isAuthenticated) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#f8fafc' }}>
@@ -78,7 +109,7 @@ export default function PartnerDashboard() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc', padding: '32px' }}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+      <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <h1 style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#0f172a' }}>🤝 제휴사 파트너 오더 현황</h1>
           <button 
@@ -94,20 +125,23 @@ export default function PartnerDashboard() {
             <thead style={{ background: '#f1f5f9' }}>
               <tr>
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: '14px' }}>접수 일시</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: '14px' }}>상태</th>
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: '14px' }}>오픈 예정 지역</th>
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: '14px' }}>오픈 시기</th>
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: '14px' }}>고객 정보</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: '14px' }}>필요 기구</th>
                 <th style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: '14px' }}>상세 도면</th>
               </tr>
             </thead>
             <tbody>
               {quotes.length === 0 ? (
                 <tr>
-                  <td colSpan={5} style={{ padding: '32px', textAlign: 'center', color: '#64748b' }}>현재 진행 중인 오더가 없습니다.</td>
+                  <td colSpan={7} style={{ padding: '32px', textAlign: 'center', color: '#64748b' }}>현재 진행 중인 오더가 없습니다.</td>
                 </tr>
               ) : quotes.map(q => (
                 <tr key={q.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                   <td style={{ padding: '16px', color: '#0f172a', fontSize: '14px' }}>{new Date(q.createdAt).toLocaleDateString()}</td>
+                  <td style={{ padding: '16px' }}>{getStatusBadge(q.status)}</td>
                   <td style={{ padding: '16px', color: '#0f172a', fontWeight: 'bold' }}>{q.region}</td>
                   <td style={{ padding: '16px', color: '#64748b' }}>{q.expectedDate}</td>
                   <td style={{ padding: '16px' }}>
@@ -121,6 +155,9 @@ export default function PartnerDashboard() {
                         연락처 열람하기
                       </button>
                     </div>
+                  </td>
+                  <td style={{ padding: '16px', color: '#0f172a', fontSize: '13px', maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={summarizeEquipments(q.equipments)}>
+                    {summarizeEquipments(q.equipments)}
                   </td>
                   <td style={{ padding: '16px' }}>
                     <button 
