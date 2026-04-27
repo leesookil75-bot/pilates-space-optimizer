@@ -36,6 +36,7 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
   // Touch zoom state
   const lastCenter = useRef<{x: number, y: number} | null>(null);
   const lastDist = useRef<number>(0);
+  const wasPinching = useRef<boolean>(false);
 
   const checkDeselect = (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
     // deselect when clicked on empty area or grid
@@ -104,40 +105,62 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
 
     const scaleBy = 1.1;
     const oldScale = stage.scaleX();
+    const pointer = stage.getPointerPosition();
+
+    if (!pointer) return;
 
     const mousePointTo = {
-      x: stage.getPointerPosition()!.x / oldScale - stage.x() / oldScale,
-      y: stage.getPointerPosition()!.y / oldScale - stage.y() / oldScale,
+      x: (pointer.x - stage.x()) / oldScale,
+      y: (pointer.y - stage.y()) / oldScale,
     };
 
-    // Zoom in or out
-    const newScale = e.evt.deltaY < 0 ? oldScale * scaleBy : oldScale / scaleBy;
-    
-    // Limit min/max zoom
-    if (newScale < 0.1 || newScale > 10) return;
+    let newScale = e.evt.deltaY < 0 ? oldScale * scaleBy : oldScale / scaleBy;
+    newScale = Math.max(0.1, Math.min(newScale, 5));
 
     setScale(newScale);
     setPosition({
-      x: -(mousePointTo.x - stage.getPointerPosition()!.x / newScale) * newScale,
-      y: -(mousePointTo.y - stage.getPointerPosition()!.y / newScale) * newScale,
+      x: pointer.x - mousePointTo.x * newScale,
+      y: pointer.y - mousePointTo.y * newScale,
     });
   }, []);
+
+  const getDistance = (p1: { x: number, y: number }, p2: { x: number, y: number }) => {
+    return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+  };
+
+  const getCenter = (p1: { x: number, y: number }, p2: { x: number, y: number }) => {
+    return {
+      x: (p1.x + p2.x) / 2,
+      y: (p1.y + p2.y) / 2,
+    };
+  };
 
   // Native touch event listeners for robust pinch-to-zoom
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
+    const handleTouchStartNative = (e: TouchEvent) => {
+      if (e.touches.length >= 2) {
+        wasPinching.current = true;
+      }
+    };
+
     const handleTouchMoveNative = (e: TouchEvent) => {
       e.preventDefault(); // Prevent native scroll/zoom
 
       if (e.touches.length >= 2) {
+        wasPinching.current = true;
         const stage = stageRef.current;
         if (!stage) return;
 
-        if (stage.isDragging()) {
-          stage.stopDrag();
+        // Force stop any active Konva dragging (e.g. equipment being dragged accidentally)
+        if (typeof Konva !== 'undefined' && Konva.isDragging()) {
+           // Konva.isDragging() returns boolean, but there is no public API to stop globally easily without node reference.
+           // However, if we just stop propagation, Konva won't receive the touchmove.
         }
+        
+        e.stopPropagation(); // VERY IMPORTANT: Stop Konva from seeing this move!
 
         const touch1 = e.touches[0];
         const touch2 = e.touches[1];
@@ -196,19 +219,29 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
 
         lastDist.current = dist;
         lastCenter.current = center;
+      } else if (wasPinching.current) {
+        // Prevent lingering single-finger touch from triggering a jump or drag
+        e.stopPropagation();
       }
     };
 
-    const handleTouchEndNative = () => {
-      lastDist.current = 0;
-      lastCenter.current = null;
+    const handleTouchEndNative = (e: TouchEvent) => {
+      if (e.touches.length < 2) {
+        lastDist.current = 0;
+        lastCenter.current = null;
+      }
+      if (e.touches.length === 0) {
+        wasPinching.current = false;
+      }
     };
 
+    container.addEventListener('touchstart', handleTouchStartNative, { capture: true });
     container.addEventListener('touchmove', handleTouchMoveNative, { passive: false, capture: true });
     container.addEventListener('touchend', handleTouchEndNative, { capture: true });
     container.addEventListener('touchcancel', handleTouchEndNative, { capture: true });
 
     return () => {
+      container.removeEventListener('touchstart', handleTouchStartNative, { capture: true });
       container.removeEventListener('touchmove', handleTouchMoveNative, { capture: true });
       container.removeEventListener('touchend', handleTouchEndNative, { capture: true });
       container.removeEventListener('touchcancel', handleTouchEndNative, { capture: true });
