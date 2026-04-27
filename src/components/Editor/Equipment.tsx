@@ -35,6 +35,17 @@ export const EQUIPMENT_DIMS: Record<EquipmentType, { width: number; height: numb
   Door: { width: 90, height: 90, color: '#e5e7eb', label: '출입문' },
 };
 
+const getSnapSize = (scale: number) => {
+  if (scale >= 3) return 10;
+  if (scale >= 1.5) return 25;
+  return 50;
+};
+
+const snapToGrid = (val: number, scale: number) => {
+  const snapSize = getSnapSize(scale);
+  return Math.round(val / snapSize) * snapSize;
+};
+
 export default function Equipment({ data, isSelected, onSelect, onChange, scale }: EquipmentProps) {
   const shapeRef = useRef<Konva.Group>(null);
   const trRef = useRef<Konva.Transformer>(null);
@@ -90,6 +101,18 @@ export default function Equipment({ data, isSelected, onSelect, onChange, scale 
         // Center origin for easier rotation
         offsetX={data.type === 'Door' ? 0 : dims.width / 2}
         offsetY={data.type === 'Door' ? 0 : dims.height / 2}
+        dragBoundFunc={function(this: any, pos) {
+           const stage = this.getStage();
+           if (!stage) return pos;
+           const transform = stage.getAbsoluteTransform().copy();
+           transform.invert();
+           const relativePos = transform.point(pos);
+           const snappedRelative = {
+              x: snapToGrid(relativePos.x, scale),
+              y: snapToGrid(relativePos.y, scale)
+           };
+           return stage.getAbsoluteTransform().point(snappedRelative);
+        }}
         onMouseEnter={(e) => {
           const container = e.target.getStage()?.container();
           if (container) container.style.cursor = 'move';
