@@ -59,6 +59,7 @@ export default function Home() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showCopyPrompt, setShowCopyPrompt] = useState(false);
   const [copyQuantity, setCopyQuantity] = useState(1);
+  const [copyDirection, setCopyDirection] = useState<'up' | 'down' | 'left' | 'right'>('right');
 
   const editorRef = useRef<EditorCanvasHandle>(null);
 
@@ -243,6 +244,13 @@ export default function Home() {
     }
   };
 
+  const toggleLockEquipment = (id: string) => {
+    const newEquipments = equipments.map(eq => 
+      eq.id === id ? { ...eq, isLocked: !eq.isLocked } : eq
+    );
+    updateEquipments(newEquipments);
+  };
+
   const rotateEquipment = () => {
     if (!selectedId) return;
     const newEquipments = equipments.map(eq => 
@@ -264,16 +272,25 @@ export default function Home() {
     
     const clearancePx = clearance / 2;
     
-    // 기구를 나란히(측면으로) 배열하기 위해 기구의 로컬 Y축 방향으로 복사합니다.
-    // 회전 각도(rotation)에 90도를 더해 로컬 Y축의 절대 각도를 구합니다.
-    const angleRad = (sourceEq.rotation + 90) * Math.PI / 180;
+    // 기구의 회전을 고려하여 시각적 너비와 높이를 구합니다.
+    const rot = (sourceEq.rotation % 180 + 180) % 180;
+    const isHorizontal = rot < 45 || rot > 135;
+    const vw = isHorizontal ? w : h;
+    const vh = isHorizontal ? h : w;
+
+    // 회색 여유 공간 영역의 크기
+    const offsetMagnitudeX = vw + clearancePx * 2;
+    const offsetMagnitudeY = vh + clearancePx * 2;
     
-    // 중심점 간의 이동 거리는 기구의 세로 길이 + 양쪽 여유공간 입니다.
-    // 이 거리를 유지하면 회색 영역(여유 공간)이 정확히 맞닿게 됩니다.
-    const offsetMagnitude = h + clearancePx * 2;
-    
-    const offsetX = Math.cos(angleRad) * offsetMagnitude;
-    const offsetY = Math.sin(angleRad) * offsetMagnitude;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    switch (copyDirection) {
+      case 'up': offsetY = -offsetMagnitudeY; break;
+      case 'down': offsetY = offsetMagnitudeY; break;
+      case 'left': offsetX = -offsetMagnitudeX; break;
+      case 'right': offsetX = offsetMagnitudeX; break;
+    }
 
     const newCopies: EquipmentData[] = [];
     for (let i = 1; i <= copyQuantity; i++) {
@@ -401,10 +418,13 @@ export default function Home() {
       {/* Contextual Floating Pill Menu */}
       {selectedEquipment && !isMobileMenuOpen && (
         <div className={styles.contextMenu}>
-          <button onClick={rotateEquipment}>🔄 회전</button>
+          {!selectedEquipment.isLocked && <button onClick={rotateEquipment}>🔄 회전</button>}
           <button onClick={() => setShowCopyPrompt(true)}>📋 복사</button>
-          <button onClick={() => setIsMobileMenuOpen(true)}>⚙️ 설정</button>
-          <button className={styles.deleteBtn} onClick={() => removeEquipment(selectedEquipment.id)}>🗑️ 삭제</button>
+          {!selectedEquipment.isLocked && <button onClick={() => setIsMobileMenuOpen(true)}>⚙️ 설정</button>}
+          <button onClick={() => toggleLockEquipment(selectedEquipment.id)}>
+            {selectedEquipment.isLocked ? '🔓 해제' : '🔒 고정'}
+          </button>
+          {!selectedEquipment.isLocked && <button className={styles.deleteBtn} onClick={() => removeEquipment(selectedEquipment.id)}>🗑️ 삭제</button>}
         </div>
       )}
 
@@ -416,8 +436,32 @@ export default function Home() {
               연속 자동 복사
             </h2>
             <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>
-              현재 여유 공간(Clearance) 간격에 맞춰 일렬로 자동 배치합니다.
+              선택한 방향으로 여유 공간 간격에 맞춰 일렬 자동 배치합니다.
             </p>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '16px' }}>
+              <button 
+                onClick={() => setCopyDirection('left')} 
+                style={{ padding: '8px 0', borderRadius: '8px', border: '1px solid #d1d5db', cursor: 'pointer', background: copyDirection === 'left' ? '#f97316' : 'white', color: copyDirection === 'left' ? 'white' : 'black' }}>
+                ⬅️ 좌
+              </button>
+              <button 
+                onClick={() => setCopyDirection('up')} 
+                style={{ padding: '8px 0', borderRadius: '8px', border: '1px solid #d1d5db', cursor: 'pointer', background: copyDirection === 'up' ? '#f97316' : 'white', color: copyDirection === 'up' ? 'white' : 'black' }}>
+                ⬆️ 상
+              </button>
+              <button 
+                onClick={() => setCopyDirection('down')} 
+                style={{ padding: '8px 0', borderRadius: '8px', border: '1px solid #d1d5db', cursor: 'pointer', background: copyDirection === 'down' ? '#f97316' : 'white', color: copyDirection === 'down' ? 'white' : 'black' }}>
+                ⬇️ 하
+              </button>
+              <button 
+                onClick={() => setCopyDirection('right')} 
+                style={{ padding: '8px 0', borderRadius: '8px', border: '1px solid #d1d5db', cursor: 'pointer', background: copyDirection === 'right' ? '#f97316' : 'white', color: copyDirection === 'right' ? 'white' : 'black' }}>
+                ➡️ 우
+              </button>
+            </div>
+
             <div className={styles.copyInputGroup}>
               <button 
                 className={styles.copyInputBtn} 

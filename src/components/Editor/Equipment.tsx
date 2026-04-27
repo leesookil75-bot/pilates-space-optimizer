@@ -15,6 +15,7 @@ export interface EquipmentData {
   height?: number; // Optional custom height
   clearance?: number; // Optional custom clearance in cm
   customLabel?: string; // For 'Custom' type equipments
+  isLocked?: boolean; // Lock position and rotation
 }
 
 interface EquipmentProps {
@@ -93,7 +94,7 @@ export default function Equipment({ data, isSelected, onSelect, onChange, scale 
         x={data.x}
         y={data.y}
         rotation={data.rotation}
-        draggable
+        draggable={!data.isLocked}
         onClick={onSelect}
         onTap={onSelect}
         onDragEnd={handleDragEnd}
@@ -102,22 +103,33 @@ export default function Equipment({ data, isSelected, onSelect, onChange, scale 
         offsetX={data.type === 'Door' ? 0 : dims.width / 2}
         offsetY={data.type === 'Door' ? 0 : dims.height / 2}
         dragBoundFunc={function(this: any, pos) {
+           if (data.isLocked) return this.getAbsolutePosition();
+           
            const stage = this.getStage();
            if (!stage) return pos;
            const transform = stage.getAbsoluteTransform().copy();
            transform.invert();
            const relativePos = transform.point(pos);
+           
+           // Calculate visual width/height based on rotation to snap EDGES instead of center
+           const rot = (data.rotation % 180 + 180) % 180;
+           const isHorizontal = rot < 45 || rot > 135;
+           const vw = isHorizontal ? dims.width : dims.height;
+           const vh = isHorizontal ? dims.height : dims.width;
+
            const snappedRelative = {
-              x: snapToGrid(relativePos.x, scale),
-              y: snapToGrid(relativePos.y, scale)
+              x: snapToGrid(relativePos.x - vw / 2, scale) + vw / 2,
+              y: snapToGrid(relativePos.y - vh / 2, scale) + vh / 2
            };
            return stage.getAbsoluteTransform().point(snappedRelative);
         }}
         onMouseEnter={(e) => {
+          if (data.isLocked) return;
           const container = e.target.getStage()?.container();
           if (container) container.style.cursor = 'move';
         }}
         onMouseLeave={(e) => {
+          if (data.isLocked) return;
           const container = e.target.getStage()?.container();
           if (container) container.style.cursor = 'grab';
         }}
@@ -197,7 +209,7 @@ export default function Equipment({ data, isSelected, onSelect, onChange, scale 
         )}
       </Group>
 
-      {isSelected && (
+      {isSelected && !data.isLocked && (
         <Transformer
           ref={trRef}
           boundBoxFunc={(oldBox, newBox) => {
