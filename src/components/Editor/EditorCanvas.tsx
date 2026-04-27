@@ -61,13 +61,33 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
     }
   }));
 
+  const hasInitializedScale = useRef(false);
+
   useEffect(() => {
     const handleResize = () => {
       if (containerRef.current) {
-        setStageSize({
-          width: containerRef.current.offsetWidth,
-          height: containerRef.current.offsetHeight,
-        });
+        const width = containerRef.current.offsetWidth;
+        const height = containerRef.current.offsetHeight;
+        setStageSize({ width, height });
+
+        if (!hasInitializedScale.current && width > 0) {
+          // Calculate auto-fit for the default 500x500 room (center at 350,350)
+          if (width < 600) {
+            const newScale = width / 700; // room size 500 + padding 200
+            setScale(newScale);
+            setPosition({
+              x: width / 2 - 350 * newScale,
+              y: height / 2 - 350 * newScale - 50, // Shift slightly up for mobile toolbar
+            });
+          } else {
+            // Desktop center
+            setPosition({
+              x: width / 2 - 350,
+              y: height / 2 - 350,
+            });
+          }
+          hasInitializedScale.current = true;
+        }
       }
     };
 

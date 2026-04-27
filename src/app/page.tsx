@@ -267,7 +267,8 @@ export default function Home() {
               color: '#374151'
             }}
           >
-            ↩ 되돌리기
+            <span className={styles.desktopOnly}>↩ 되돌리기</span>
+            <span className={styles.mobileOnly}>↩</span>
           </button>
           <button 
             className={styles.headerButton}
@@ -287,7 +288,8 @@ export default function Home() {
               color: '#374151'
             }}
           >
-            다시실행 ↪
+            <span className={styles.desktopOnly}>다시실행 ↪</span>
+            <span className={styles.mobileOnly}>↪</span>
           </button>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
@@ -304,7 +306,8 @@ export default function Home() {
               cursor: 'pointer',
               boxShadow: '0 2px 4px rgba(249, 115, 22, 0.2)'
             }}>
-            🚀 인테리어/기구 비교 견적 받기
+            <span className={styles.desktopOnly}>🚀 인테리어/기구 비교 견적 받기</span>
+            <span className={styles.mobileOnly}>🚀 견적받기</span>
           </button>
           <button 
             className={styles.headerButton}
@@ -324,7 +327,8 @@ export default function Home() {
               fontWeight: 600,
               cursor: 'pointer'
             }}>
-            도면 저장 (PNG)
+            <span className={styles.desktopOnly}>도면 저장 (PNG)</span>
+            <span className={styles.mobileOnly}>💾 저장</span>
           </button>
         </div>
       </header>
@@ -339,6 +343,7 @@ export default function Home() {
             </h2>
             <div className={styles.toolsGrid}>
               <button 
+            className={styles.toolButton}
             onClick={() => {
               if (window.confirm('기존 도면과 배치된 기구가 모두 초기화됩니다. 처음부터 다시 그리시겠습니까?')) {
                 // Reset to default outer wall
@@ -359,13 +364,12 @@ export default function Home() {
                 updateEquipments([]);
               }
             }}
-            style={{ display: 'block', width: '100%', padding: '10px', textAlign: 'left', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', marginBottom: '8px', cursor: 'pointer', fontWeight: 500, color: '#374151' }}
           >
-            🔄 전체 초기화 (다시 그리기)
+            🔄 전체 초기화
           </button>
           <button 
+            className={styles.toolButton}
             onClick={addRoom}
-            style={{ display: 'block', width: '100%', padding: '10px', textAlign: 'left', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', marginBottom: '24px', cursor: 'pointer', fontWeight: 500, color: '#374151' }}
           >
             + 룸(Room) 추가
           </button>
@@ -446,19 +450,19 @@ export default function Home() {
               기구 (Equipment)
             </h2>
             <div className={styles.toolsGrid}>
-              <button onClick={() => addEquipment('Reformer')} style={{ display: 'block', width: '100%', padding: '10px', textAlign: 'left', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', marginBottom: '8px', cursor: 'pointer', fontWeight: 500, color: '#374151' }}>
-            🛏️ 리포머 (Reformer)
+              <button className={styles.toolButton} onClick={() => addEquipment('Reformer')}>
+            🛏️ 리포머
           </button>
-          <button onClick={() => addEquipment('Cadillac')} style={{ display: 'block', width: '100%', padding: '10px', textAlign: 'left', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', marginBottom: '8px', cursor: 'pointer', fontWeight: 500, color: '#374151' }}>
-            🏗️ 캐딜락 (Cadillac)
+          <button className={styles.toolButton} onClick={() => addEquipment('Cadillac')}>
+            🏗️ 캐딜락
           </button>
-          <button onClick={() => addEquipment('Chair')} style={{ display: 'block', width: '100%', padding: '10px', textAlign: 'left', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', marginBottom: '8px', cursor: 'pointer', fontWeight: 500, color: '#374151' }}>
-            🪑 체어 (Chair)
+          <button className={styles.toolButton} onClick={() => addEquipment('Chair')}>
+            🪑 체어
           </button>
-          <button onClick={() => addEquipment('Barrel')} style={{ display: 'block', width: '100%', padding: '10px', textAlign: 'left', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '6px', marginBottom: '8px', cursor: 'pointer', fontWeight: 500, color: '#374151' }}>
-            🛢️ 바렐 (Barrel)
+          <button className={styles.toolButton} onClick={() => addEquipment('Barrel')}>
+            🛢️ 바렐
           </button>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+          <div style={{ display: 'flex', gap: '8px', marginTop: '0' }}>
             <button 
               onClick={() => addEquipment('Custom')}
               style={{ flex: 1, padding: '8px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 500, color: '#4b5563' }}>
