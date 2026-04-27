@@ -264,14 +264,16 @@ export default function Home() {
     
     const clearancePx = clearance / 2;
     
-    // Determine offset direction based on rotation
-    // 0~45, 135~225, 315~360 is roughly horizontal -> Array vertically (Y offset)
-    // 45~135, 225~315 is roughly vertical -> Array horizontally (X offset)
-    const rot = (sourceEq.rotation % 360 + 360) % 360;
-    const isHorizontal = (rot <= 45 || rot >= 315) || (rot >= 135 && rot <= 225);
+    // 기구를 나란히(측면으로) 배열하기 위해 기구의 로컬 Y축 방향으로 복사합니다.
+    // 회전 각도(rotation)에 90도를 더해 로컬 Y축의 절대 각도를 구합니다.
+    const angleRad = (sourceEq.rotation + 90) * Math.PI / 180;
     
-    const offsetX = isHorizontal ? 0 : (w + clearancePx * 2);
-    const offsetY = isHorizontal ? (h + clearancePx * 2) : 0;
+    // 중심점 간의 이동 거리는 기구의 세로 길이 + 양쪽 여유공간 입니다.
+    // 이 거리를 유지하면 회색 영역(여유 공간)이 정확히 맞닿게 됩니다.
+    const offsetMagnitude = h + clearancePx * 2;
+    
+    const offsetX = Math.cos(angleRad) * offsetMagnitude;
+    const offsetY = Math.sin(angleRad) * offsetMagnitude;
 
     const newCopies: EquipmentData[] = [];
     for (let i = 1; i <= copyQuantity; i++) {
