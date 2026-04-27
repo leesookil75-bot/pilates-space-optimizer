@@ -210,6 +210,102 @@ a.secondary {
   display: none;
 }
 
+/* Contextual Menu (Floating Pill) */
+.contextMenu {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  border-radius: 30px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  display: flex;
+  padding: 6px;
+  gap: 4px;
+  z-index: 950;
+  border: 1px solid rgba(0,0,0,0.05);
+}
+
+.contextMenu button {
+  background: transparent;
+  border: none;
+  padding: 10px 14px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.contextMenu button:active {
+  background: #f3f4f6;
+  transform: scale(0.95);
+}
+
+.contextMenu .deleteBtn {
+  color: #ef4444;
+}
+
+/* Copy Prompt Modal */
+.copyPromptOverlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+
+.copyPromptModal {
+  background: white;
+  padding: 24px;
+  border-radius: 16px;
+  width: 320px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.copyInputGroup {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin: 20px 0;
+}
+
+.copyInputBtn {
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  border: 1px solid #d1d5db;
+  background: white;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #374151;
+  user-select: none;
+}
+
+.copyInputBtn:active {
+  background: #f3f4f6;
+}
+
+.copyInputGroup span {
+  font-size: 28px;
+  font-weight: 700;
+  width: 40px;
+}
+
 .toolSection {
   margin-bottom: 24px;
 }
@@ -366,7 +462,17 @@ a.secondary {
     color: #4b5563;
   }
 
-  /* Inside bottom sheet, grid makes more sense than horizontal scroll */
+  /* Float Context Menu above bottom sheet slightly */
+  .contextMenu {
+    bottom: 24px;
+    padding: 4px;
+  }
+  
+  .contextMenu button {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
   .toolsGrid {
     display: grid !important;
     grid-template-columns: repeat(2, 1fr) !important;

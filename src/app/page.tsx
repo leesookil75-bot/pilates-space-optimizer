@@ -57,6 +57,8 @@ export default function Home() {
   });
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showCopyPrompt, setShowCopyPrompt] = useState(false);
+  const [copyQuantity, setCopyQuantity] = useState(1);
 
   const editorRef = useRef<EditorCanvasHandle>(null);
 
@@ -241,6 +243,51 @@ export default function Home() {
     }
   };
 
+  const rotateEquipment = () => {
+    if (!selectedId) return;
+    const newEquipments = equipments.map(eq => 
+      eq.id === selectedId ? { ...eq, rotation: (eq.rotation + 45) % 360 } : eq
+    );
+    updateEquipments(newEquipments);
+  };
+
+  const executeAutoCopy = () => {
+    if (!selectedId || copyQuantity <= 0) return;
+    
+    const sourceEq = equipments.find(eq => eq.id === selectedId);
+    if (!sourceEq) return;
+
+    const dim = EQUIPMENT_DIMS[sourceEq.type] || EQUIPMENT_DIMS['Custom'];
+    const w = sourceEq.width || dim.width;
+    const h = sourceEq.height || dim.height;
+    const clearance = sourceEq.clearance ?? 40;
+    
+    const clearancePx = clearance / 2;
+    
+    // Determine offset direction based on rotation
+    // 0~45, 135~225, 315~360 is roughly horizontal -> Array vertically (Y offset)
+    // 45~135, 225~315 is roughly vertical -> Array horizontally (X offset)
+    const rot = (sourceEq.rotation % 360 + 360) % 360;
+    const isHorizontal = (rot <= 45 || rot >= 315) || (rot >= 135 && rot <= 225);
+    
+    const offsetX = isHorizontal ? 0 : (w + clearancePx * 2);
+    const offsetY = isHorizontal ? (h + clearancePx * 2) : 0;
+
+    const newCopies: EquipmentData[] = [];
+    for (let i = 1; i <= copyQuantity; i++) {
+      newCopies.push({
+        ...sourceEq,
+        id: `${sourceEq.type}-${Date.now()}-${i}`,
+        x: sourceEq.x + (offsetX * i),
+        y: sourceEq.y + (offsetY * i),
+      });
+    }
+
+    updateEquipments([...equipments, ...newCopies]);
+    setShowCopyPrompt(false);
+    setCopyQuantity(1);
+  };
+
   return (
     <main className={styles.layout}>
       {/* Top Navigation Bar */}
@@ -340,12 +387,65 @@ export default function Home() {
         onClick={() => setIsMobileMenuOpen(false)} 
       />
       
-      <button 
-        className={styles.fabButton}
-        onClick={() => setIsMobileMenuOpen(true)}
-      >
-        +
-      </button>
+      {!selectedEquipment && (
+        <button 
+          className={styles.fabButton}
+          onClick={() => setIsMobileMenuOpen(true)}
+        >
+          +
+        </button>
+      )}
+
+      {/* Contextual Floating Pill Menu */}
+      {selectedEquipment && !isMobileMenuOpen && (
+        <div className={styles.contextMenu}>
+          <button onClick={rotateEquipment}>🔄 회전</button>
+          <button onClick={() => setShowCopyPrompt(true)}>📋 복사</button>
+          <button onClick={() => setIsMobileMenuOpen(true)}>⚙️ 설정</button>
+          <button className={styles.deleteBtn} onClick={() => removeEquipment(selectedEquipment.id)}>🗑️ 삭제</button>
+        </div>
+      )}
+
+      {/* Copy Prompt Modal */}
+      {showCopyPrompt && (
+        <div className={styles.copyPromptOverlay} onClick={() => setShowCopyPrompt(false)}>
+          <div className={styles.copyPromptModal} onClick={e => e.stopPropagation()}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#111827', marginBottom: '8px' }}>
+              연속 자동 복사
+            </h2>
+            <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>
+              현재 여유 공간(Clearance) 간격에 맞춰 일렬로 자동 배치합니다.
+            </p>
+            <div className={styles.copyInputGroup}>
+              <button 
+                className={styles.copyInputBtn} 
+                onClick={() => setCopyQuantity(Math.max(1, copyQuantity - 1))}
+              >-</button>
+              <span>{copyQuantity}</span>
+              <button 
+                className={styles.copyInputBtn} 
+                onClick={() => setCopyQuantity(Math.min(20, copyQuantity + 1))}
+              >+</button>
+            </div>
+            <button 
+              onClick={executeAutoCopy}
+              style={{
+                width: '100%',
+                background: '#3b82f6',
+                color: 'white',
+                border: 'none',
+                padding: '12px',
+                borderRadius: '8px',
+                fontWeight: 600,
+                fontSize: '1rem',
+                cursor: 'pointer'
+              }}
+            >
+              배치하기
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Editor Area */}
       <div className={styles.editorArea}>
