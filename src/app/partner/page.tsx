@@ -6,7 +6,11 @@ import dynamic from 'next/dynamic';
 const EditorCanvas = dynamic(() => import('@/components/Editor/EditorCanvas'), { ssr: false });
 
 export default function PartnerDashboard() {
+  const [partnerId, setPartnerId] = useState('');
   const [password, setPassword] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [regData, setRegData] = useState({ companyName: '', contactName: '', phone: '', businessNumber: '' });
+  
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [quotes, setQuotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -24,7 +28,7 @@ export default function PartnerDashboard() {
       const res = await fetch('/api/partner/quotes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password })
+        body: JSON.stringify({ partnerId, password })
       });
       
       const data = await res.json();
@@ -33,7 +37,34 @@ export default function PartnerDashboard() {
         setIsAuthenticated(true);
         setQuotes(data.quotes || []);
       } else {
-        setError('비밀번호가 올바르지 않습니다.');
+        setError(data.error || '로그인 실패');
+      }
+    } catch (err) {
+      setError('서버 통신 오류');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/partner/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ partnerId, password, ...regData })
+      });
+      
+      const data = await res.json();
+      if (res.ok) {
+        alert('입점 신청이 완료되었습니다. 관리자 승인 후 로그인하실 수 있습니다.');
+        setIsRegistering(false);
+        setPassword('');
+      } else {
+        setError(data.error || '가입 실패');
       }
     } catch (err) {
       setError('서버 통신 오류');
@@ -78,13 +109,69 @@ export default function PartnerDashboard() {
   };
 
   if (!isAuthenticated) {
+    if (isRegistering) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#f8fafc', padding: '16px' }}>
+          <form onSubmit={handleRegister} style={{ background: 'white', padding: '32px', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', width: '100%', maxWidth: '400px' }}>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '8px', textAlign: 'center', color: '#0f172a' }}>제휴사 입점 신청</h1>
+            <p style={{ fontSize: '13px', color: '#64748b', textAlign: 'center', marginBottom: '24px' }}>관리자 승인 후 파트너 포털을 이용할 수 있습니다.</p>
+            
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '13px', marginBottom: '4px', color: '#334155' }}>희망 아이디 *</label>
+              <input type="text" value={partnerId} onChange={e => setPartnerId(e.target.value)} required style={{ width: '100%', padding: '10px', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
+            </div>
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '13px', marginBottom: '4px', color: '#334155' }}>비밀번호 *</label>
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)} required style={{ width: '100%', padding: '10px', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
+            </div>
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '13px', marginBottom: '4px', color: '#334155' }}>업체명 (상호) *</label>
+              <input type="text" value={regData.companyName} onChange={e => setRegData({...regData, companyName: e.target.value})} required style={{ width: '100%', padding: '10px', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
+            </div>
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '13px', marginBottom: '4px', color: '#334155' }}>담당자 성함 *</label>
+              <input type="text" value={regData.contactName} onChange={e => setRegData({...regData, contactName: e.target.value})} required style={{ width: '100%', padding: '10px', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
+            </div>
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '13px', marginBottom: '4px', color: '#334155' }}>연락처 *</label>
+              <input type="text" value={regData.phone} onChange={e => setRegData({...regData, phone: e.target.value})} required placeholder="010-1234-5678" style={{ width: '100%', padding: '10px', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
+            </div>
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{ display: 'block', fontSize: '13px', marginBottom: '4px', color: '#334155' }}>사업자등록번호</label>
+              <input type="text" value={regData.businessNumber} onChange={e => setRegData({...regData, businessNumber: e.target.value})} style={{ width: '100%', padding: '10px', border: '1px solid #cbd5e1', borderRadius: '6px' }} />
+            </div>
+
+            {error && <p style={{ color: '#ef4444', fontSize: '14px', marginBottom: '16px' }}>{error}</p>}
+            
+            <button type="submit" disabled={loading} style={{ width: '100%', padding: '12px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '6px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '12px' }}>
+              {loading ? '처리 중...' : '입점 신청하기'}
+            </button>
+            <button type="button" onClick={() => setIsRegistering(false)} style={{ width: '100%', padding: '12px', background: 'transparent', color: '#64748b', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '14px', cursor: 'pointer' }}>
+              돌아가기
+            </button>
+          </form>
+        </div>
+      );
+    }
+
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#f8fafc', padding: '16px' }}>
         <form onSubmit={handleLogin} style={{ background: 'white', padding: '32px', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', width: '100%', maxWidth: '360px' }}>
           <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '8px', textAlign: 'center', color: '#0f172a' }}>제휴사 파트너 포털</h1>
           <p style={{ fontSize: '13px', color: '#64748b', textAlign: 'center', marginBottom: '24px' }}>인테리어 및 기구 제휴사 전용 접속</p>
           <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: '#334155' }}>발급받은 비밀번호</label>
+            <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: '#334155' }}>아이디</label>
+            <input 
+              type="text" 
+              value={partnerId}
+              onChange={e => setPartnerId(e.target.value)}
+              style={{ width: '100%', padding: '12px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '16px', boxSizing: 'border-box' }}
+              placeholder="아이디 입력"
+              required
+            />
+          </div>
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: '#334155' }}>비밀번호</label>
             <input 
               type="password" 
               value={password}
@@ -98,10 +185,21 @@ export default function PartnerDashboard() {
           <button 
             type="submit" 
             disabled={loading}
-            style={{ width: '100%', padding: '12px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '6px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}
+            style={{ width: '100%', padding: '12px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '6px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '16px' }}
           >
             {loading ? '확인 중...' : '파트너 로그인'}
           </button>
+          
+          <div style={{ textAlign: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '16px' }}>
+            <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '8px' }}>아직 파트너가 아니신가요?</p>
+            <button 
+              type="button" 
+              onClick={() => { setIsRegistering(true); setError(''); }}
+              style={{ background: 'none', border: 'none', color: '#3b82f6', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer', textDecoration: 'underline' }}
+            >
+              제휴사 입점 신청하기
+            </button>
+          </div>
         </form>
       </div>
     );

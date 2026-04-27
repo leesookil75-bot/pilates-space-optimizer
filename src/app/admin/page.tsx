@@ -9,8 +9,10 @@ export default function AdminDashboard() {
   const [password, setPassword] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [quotes, setQuotes] = useState<any[]>([]);
+  const [partners, setPartners] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState<'quotes' | 'partners'>('quotes');
   
   // Floor plan viewer state
   const [viewingQuote, setViewingQuote] = useState<any | null>(null);
@@ -29,9 +31,17 @@ export default function AdminDashboard() {
       
       const data = await res.json();
       
+      const partnerRes = await fetch('/api/admin/partners', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, action: 'get' })
+      });
+      const partnerData = await partnerRes.json();
+      
       if (res.ok) {
         setIsAuthenticated(true);
         setQuotes(data.quotes || []);
+        setPartners(partnerData.partners || []);
       } else {
         setError('비밀번호가 올바르지 않습니다.');
       }
@@ -56,6 +66,23 @@ export default function AdminDashboard() {
       }
     } catch (error) {
       alert('상태 업데이트 오류');
+    }
+  };
+
+  const handlePartnerStatusChange = async (partnerId: string, newStatus: string) => {
+    try {
+      const res = await fetch('/api/admin/partners', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, action: 'updateStatus', partnerId, newStatus })
+      });
+      if (res.ok) {
+        setPartners(prev => prev.map(p => p.id === partnerId ? { ...p, status: newStatus } : p));
+      } else {
+        alert('파트너 상태 업데이트 실패');
+      }
+    } catch (error) {
+      alert('파트너 상태 업데이트 오류');
     }
   };
 
@@ -87,6 +114,15 @@ export default function AdminDashboard() {
       case '계약 완료': return { bg: '#dcfce3', color: '#166534' };
       case '보류/취소': return { bg: '#f3f4f6', color: '#4b5563' };
       default: return { bg: '#f3f4f6', color: '#4b5563' };
+    }
+  };
+
+  const getPartnerStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending': return { bg: '#fef08a', color: '#854d0e', label: '승인 대기' };
+      case 'approved': return { bg: '#dcfce3', color: '#166534', label: '승인 완료' };
+      case 'rejected': return { bg: '#fee2e2', color: '#991b1b', label: '반려됨' };
+      default: return { bg: '#f3f4f6', color: '#4b5563', label: '알 수 없음' };
     }
   };
 
@@ -125,13 +161,29 @@ export default function AdminDashboard() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <h1 style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#111827' }}>👑 견적 요청 관리자 대시보드</h1>
           <button 
-            onClick={() => { setIsAuthenticated(false); setPassword(''); setQuotes([]); }}
+            onClick={() => { setIsAuthenticated(false); setPassword(''); setQuotes([]); setPartners([]); }}
             style={{ padding: '8px 16px', background: 'white', border: '1px solid #d1d5db', borderRadius: '6px', cursor: 'pointer' }}
           >
             로그아웃
           </button>
         </div>
 
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
+          <button 
+            onClick={() => setActiveTab('quotes')}
+            style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold', background: activeTab === 'quotes' ? '#111827' : 'white', color: activeTab === 'quotes' ? 'white' : '#4b5563', boxShadow: activeTab === 'quotes' ? 'none' : '0 1px 2px rgba(0,0,0,0.05)' }}
+          >
+            📋 견적 요청 관리
+          </button>
+          <button 
+            onClick={() => setActiveTab('partners')}
+            style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold', background: activeTab === 'partners' ? '#111827' : 'white', color: activeTab === 'partners' ? 'white' : '#4b5563', boxShadow: activeTab === 'partners' ? 'none' : '0 1px 2px rgba(0,0,0,0.05)' }}
+          >
+            🤝 제휴사 파트너 관리
+          </button>
+        </div>
+
+        {activeTab === 'quotes' ? (
         <div className="responsive-table" style={{ background: 'white', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead style={{ background: '#f3f4f6' }}>
@@ -204,6 +256,63 @@ export default function AdminDashboard() {
             </tbody>
           </table>
         </div>
+        ) : (
+        <div className="responsive-table" style={{ background: 'white', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead style={{ background: '#f3f4f6' }}>
+              <tr>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontSize: '14px' }}>가입 신청일</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontSize: '14px' }}>상태 관리</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontSize: '14px' }}>업체명 (상호)</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontSize: '14px' }}>담당자 성함</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontSize: '14px' }}>연락처</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontSize: '14px' }}>사업자등록번호</th>
+              </tr>
+            </thead>
+            <tbody>
+              {partners.length === 0 ? (
+                <tr>
+                  <td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>가입한 파트너가 없습니다.</td>
+                </tr>
+              ) : partners.map(p => {
+                const partnerColor = getPartnerStatusColor(p.status);
+                return (
+                <tr key={p.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                  <td data-label="가입 신청일" style={{ padding: '16px', color: '#111827', fontSize: '14px' }}>{new Date(p.createdAt).toLocaleDateString()}</td>
+                  <td data-label="상태 관리" style={{ padding: '16px' }}>
+                    <select 
+                      value={p.status}
+                      onChange={(e) => handlePartnerStatusChange(p.id, e.target.value)}
+                      style={{ 
+                        padding: '6px 12px', 
+                        borderRadius: '20px', 
+                        border: 'none', 
+                        fontSize: '13px', 
+                        fontWeight: 'bold', 
+                        cursor: 'pointer',
+                        background: partnerColor.bg,
+                        color: partnerColor.color,
+                        outline: 'none',
+                        appearance: 'none',
+                        WebkitAppearance: 'none',
+                        minWidth: '100px'
+                      }}
+                    >
+                      <option value="pending">🟡 승인 대기</option>
+                      <option value="approved">🟢 승인 완료</option>
+                      <option value="rejected">🔴 반려됨</option>
+                    </select>
+                  </td>
+                  <td data-label="업체명" style={{ padding: '16px', color: '#111827', fontWeight: 500 }}>{p.companyName} ({p.partnerId})</td>
+                  <td data-label="담당자 성함" style={{ padding: '16px', color: '#111827' }}>{p.contactName}</td>
+                  <td data-label="연락처" style={{ padding: '16px', color: '#111827' }}>{p.phone}</td>
+                  <td data-label="사업자등록번호" style={{ padding: '16px', color: '#111827' }}>{p.businessNumber || '-'}</td>
+                </tr>
+              )})}
+            </tbody>
+          </table>
+        </div>
+        )}
       </div>
 
       {/* Floor Plan Viewer Modal */}

@@ -5,11 +5,26 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
-    const { password } = await req.json();
+    const { partnerId, password } = await req.json();
 
-    // Check partner password (in reality, we should check against a 'partners' collection)
-    if (password !== process.env.NEXT_PUBLIC_PARTNER_PASSWORD) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!partnerId || !password) {
+      return NextResponse.json({ error: 'Missing credentials' }, { status: 400 });
+    }
+
+    // Verify against 'partners' collection
+    const partnerSnapshot = await adminDb.collection('partners')
+      .where('partnerId', '==', partnerId)
+      .where('password', '==', password)
+      .get();
+
+    if (partnerSnapshot.empty) {
+      return NextResponse.json({ error: '아이디 또는 비밀번호가 올바르지 않습니다.' }, { status: 401 });
+    }
+
+    const partnerData = partnerSnapshot.docs[0].data();
+
+    if (partnerData.status !== 'approved') {
+      return NextResponse.json({ error: '관리자 승인 대기 중이거나 반려된 계정입니다.' }, { status: 403 });
     }
 
     // Fetch quotes
