@@ -186,6 +186,12 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
         y: stageCenterY - mousePointTo.y * newScale + (center.y - lastCenter.current.y),
       };
 
+      // Apply directly to stage for smooth rapid updates before React re-renders
+      stage.scale({ x: newScale, y: newScale });
+      stage.position(newPos);
+      stage.batchDraw();
+
+      // Keep React state in sync
       setScale(newScale);
       setPosition(newPos);
 
