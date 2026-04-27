@@ -200,6 +200,16 @@ a.secondary {
   overflow-y: auto;
 }
 
+/* Overlay for Bottom Sheet */
+.overlay {
+  display: none;
+}
+
+/* FAB Button */
+.fabButton {
+  display: none;
+}
+
 .toolSection {
   margin-bottom: 24px;
 }
@@ -260,44 +270,109 @@ a.secondary {
   .editorArea {
     /* Leave space for bottom toolbar */
     height: calc(100vh - 54px);
+    flex-direction: column;
   }
 
+  /* Bottom Sheet Toolbar */
   .toolbar {
     position: fixed;
     top: auto;
     bottom: 0;
     left: 0;
     width: 100vw;
-    border-radius: 16px 16px 0 0;
-    padding: 12px 12px;
-    box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
-    max-height: 40vh;
+    border-radius: 24px 24px 0 0;
+    padding: 24px 16px;
+    box-shadow: 0 -8px 24px rgba(0,0,0,0.15);
+    max-height: 70vh;
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
-    z-index: 20;
-    /* remove border to look cleaner on mobile */
-    border: none; 
-    border-top: 1px solid #e5e7eb;
+    z-index: 1000;
+    border: none;
+    background: white;
+    
+    /* Animation */
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .toolbarOpen {
+    transform: translateY(0);
+  }
+
+  /* Dimmed background when bottom sheet is open */
+  .overlay {
+    display: block;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+
+  .overlayOpen {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Floating Action Button */
+  .fabButton {
+    display: flex;
+    position: fixed;
+    bottom: 32px;
+    right: 24px;
+    width: 64px;
+    height: 64px;
+    border-radius: 32px;
+    background: #f97316;
+    color: white;
+    box-shadow: 0 6px 16px rgba(249, 115, 22, 0.4);
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    z-index: 900;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.2s, background 0.2s;
+  }
+  
+  .fabButton:active {
+    transform: scale(0.92);
+    background: #ea580c;
+  }
+
+  /* Bottom sheet handle pill */
+  .toolbar::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 4px;
+    background: #d1d5db;
+    border-radius: 2px;
   }
 
   .toolSection {
-    margin-bottom: 8px;
+    margin-bottom: 16px;
   }
 
   .toolSection h2 {
-    font-size: 0.7rem !important;
-    margin-bottom: 8px !important;
+    font-size: 0.85rem !important;
+    margin-bottom: 12px !important;
+    color: #4b5563;
   }
 
+  /* Inside bottom sheet, grid makes more sense than horizontal scroll */
   .toolsGrid {
-    display: flex;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    gap: 8px;
-    padding-bottom: 8px;
-    /* hide scrollbar for cleaner look */
-    scrollbar-width: none; 
-    -ms-overflow-style: none;
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+    overflow: visible !important;
+    padding-bottom: 0 !important;
   }
   
   .toolsGrid::-webkit-scrollbar {
@@ -305,30 +380,32 @@ a.secondary {
   }
 
   .toolsGrid > button, .toolsGrid > div {
-    flex: 0 0 auto;
-    width: auto !important;
-    white-space: nowrap;
+    flex: 1;
+    width: 100% !important;
+    white-space: normal; /* allow wrapping in grid */
     margin-bottom: 0 !important;
-    padding: 8px 14px;
-    border-radius: 20px; /* pill shape for mobile */
-    background: white;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: #f9fafb;
     border: 1px solid #e5e7eb;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    box-shadow: none;
+    font-size: 14px;
+    justify-content: center;
   }
 
   .toolsGrid > div {
-    /* specific overrides for the custom/door wrapper */
+    grid-column: span 2;
     display: flex;
+    flex-direction: row;
     gap: 8px;
-    padding: 0;
-    border: none;
-    background: transparent;
-    box-shadow: none;
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
   }
 
   .toolsGrid > div > button {
-    border-radius: 20px;
-    padding: 8px 14px;
+    border-radius: 12px;
+    padding: 12px 14px;
   }
 
   /* Make header buttons smaller on mobile */

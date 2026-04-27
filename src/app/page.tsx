@@ -56,6 +56,8 @@ export default function Home() {
     expectedDate: '미정'
   });
 
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   const editorRef = useRef<EditorCanvasHandle>(null);
 
   // Load from LocalStorage on mount
@@ -155,20 +157,20 @@ export default function Home() {
   };
 
   const addRoom = () => {
-    const innerRoomCount = rooms.filter(r => r.type === 'inner').length + 1;
     const newRoom: RoomData = {
-      id: `room-${Date.now()}`,
-      name: `룸 ${innerRoomCount}`,
+      id: `inner-${Date.now()}`,
+      name: `룸 ${rooms.length}`,
       type: 'inner',
       points: [
-        { x: 300, y: 300 },
-        { x: 500, y: 300 },
-        { x: 500, y: 500 },
-        { x: 300, y: 500 },
-      ], // 4m x 4m default
-      colorTheme: '#f97316' // Orange
+        { x: 150, y: 150 },
+        { x: 350, y: 150 },
+        { x: 350, y: 350 },
+        { x: 150, y: 350 },
+      ],
+      colorTheme: '#a855f7' // Purple
     };
     updateRooms([...rooms, newRoom]);
+    setIsMobileMenuOpen(false); // Close menu on mobile
   };
 
   const addEquipment = (type: EquipmentType) => {
@@ -180,6 +182,7 @@ export default function Home() {
       rotation: 0,
     };
     updateEquipments([...equipments, newEq]);
+    setIsMobileMenuOpen(false); // Close menu on mobile
   };
 
   const removeEquipment = (id: string) => {
@@ -191,8 +194,6 @@ export default function Home() {
 
   const handleEquipmentDimensionChange = (dimension: 'width' | 'height' | 'clearance', valueCm: number) => {
     if (!selectedId) return;
-    // width and height are stored in px (1m = 100cm = 50px, so 1cm = 0.5px)
-    // clearance is stored in cm directly
     const storeValue = dimension === 'clearance' ? valueCm : valueCm / 2;
     
     const newEquipments = equipments.map(eq => 
@@ -297,7 +298,7 @@ export default function Home() {
             className={styles.headerButton}
             onClick={() => setShowQuoteModal(true)}
             style={{
-              background: '#f97316', // Orange
+              background: '#f97316',
               color: 'white',
               border: 'none',
               padding: '8px 16px',
@@ -333,10 +334,23 @@ export default function Home() {
         </div>
       </header>
 
+      {/* Mobile FAB and Overlay */}
+      <div 
+        className={`${styles.overlay} ${isMobileMenuOpen ? styles.overlayOpen : ''}`} 
+        onClick={() => setIsMobileMenuOpen(false)} 
+      />
+      
+      <button 
+        className={styles.fabButton}
+        onClick={() => setIsMobileMenuOpen(true)}
+      >
+        +
+      </button>
+
       {/* Main Editor Area */}
       <div className={styles.editorArea}>
-        {/* Toolbar (Left) */}
-        <aside className={styles.toolbar}>
+        {/* Toolbar (Left / Bottom Sheet on Mobile) */}
+        <aside className={`${styles.toolbar} ${isMobileMenuOpen ? styles.toolbarOpen : ''}`}>
           <div className={styles.toolSection}>
             <h2 style={{ fontSize: '0.875rem', fontWeight: 600, color: '#6b7280', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               도구 (Tools)
@@ -362,6 +376,7 @@ export default function Home() {
                   }
                 ]);
                 updateEquipments([]);
+                setIsMobileMenuOpen(false); // Close menu on mobile
               }
             }}
           >
