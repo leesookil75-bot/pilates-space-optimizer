@@ -79,8 +79,8 @@ export default function PartnerDashboard() {
 
   if (!isAuthenticated) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#f8fafc' }}>
-        <form onSubmit={handleLogin} style={{ background: 'white', padding: '32px', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', width: '320px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#f8fafc', padding: '16px' }}>
+        <form onSubmit={handleLogin} style={{ background: 'white', padding: '32px', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', width: '100%', maxWidth: '360px' }}>
           <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '8px', textAlign: 'center', color: '#0f172a' }}>제휴사 파트너 포털</h1>
           <p style={{ fontSize: '13px', color: '#64748b', textAlign: 'center', marginBottom: '24px' }}>인테리어 및 기구 제휴사 전용 접속</p>
           <div style={{ marginBottom: '16px' }}>
@@ -120,7 +120,7 @@ export default function PartnerDashboard() {
           </button>
         </div>
 
-        <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+        <div className="responsive-table" style={{ background: 'white', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead style={{ background: '#f1f5f9' }}>
               <tr>
@@ -140,12 +140,12 @@ export default function PartnerDashboard() {
                 </tr>
               ) : quotes.map(q => (
                 <tr key={q.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={{ padding: '16px', color: '#0f172a', fontSize: '14px' }}>{new Date(q.createdAt).toLocaleDateString()}</td>
-                  <td style={{ padding: '16px' }}>{getStatusBadge(q.status)}</td>
-                  <td style={{ padding: '16px', color: '#0f172a', fontWeight: 'bold' }}>{q.region}</td>
-                  <td style={{ padding: '16px', color: '#64748b' }}>{q.expectedDate}</td>
-                  <td style={{ padding: '16px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <td data-label="접수 일시" style={{ padding: '16px', color: '#0f172a', fontSize: '14px' }}>{new Date(q.createdAt).toLocaleDateString()}</td>
+                  <td data-label="진행 상태" style={{ padding: '16px' }}>{getStatusBadge(q.status)}</td>
+                  <td data-label="오픈 지역" style={{ padding: '16px', color: '#0f172a', fontWeight: 'bold' }}>{q.region}</td>
+                  <td data-label="오픈 시기" style={{ padding: '16px', color: '#64748b' }}>{q.expectedDate}</td>
+                  <td data-label="고객 정보" style={{ padding: '16px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
                       <span style={{ fontSize: '13px', color: '#0f172a' }}>{q.name}</span>
                       <span style={{ fontSize: '13px', color: '#0f172a' }}>{q.phone}</span>
                       <button 
@@ -156,10 +156,10 @@ export default function PartnerDashboard() {
                       </button>
                     </div>
                   </td>
-                  <td style={{ padding: '16px', color: '#0f172a', fontSize: '13px', maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={summarizeEquipments(q.equipments)}>
+                  <td data-label="필요 기구" style={{ padding: '16px', color: '#0f172a', fontSize: '13px', maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={summarizeEquipments(q.equipments)}>
                     {summarizeEquipments(q.equipments)}
                   </td>
-                  <td style={{ padding: '16px' }}>
+                  <td data-label="도면 보기" style={{ padding: '16px' }}>
                     <button 
                       onClick={() => setViewingQuote(q)}
                       style={{ background: '#10b981', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}
@@ -176,8 +176,9 @@ export default function PartnerDashboard() {
 
       {/* Floor Plan Viewer Modal */}
       {viewingQuote && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '16px 24px', background: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px' }}>
+          <div className="modal-content" style={{ width: '100%', maxWidth: '1000px', height: '90vh', background: 'white', borderRadius: '12px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ padding: '16px 24px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <h2 style={{ margin: 0, fontSize: '1.2rem', color: '#0f172a' }}>{viewingQuote.region} 오픈 예정 도면</h2>
               <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748b' }}>고객명: {viewingQuote.name}</p>

@@ -47,3 +47,62 @@ a {
     color-scheme: dark;
   }
 }
+
+/* Responsive Table for Admin & Partner */
+@media (max-width: 768px) {
+  .responsive-table table,
+  .responsive-table thead,
+  .responsive-table tbody,
+  .responsive-table th,
+  .responsive-table td,
+  .responsive-table tr {
+    display: block;
+  }
+
+  .responsive-table thead tr {
+    position: absolute;
+    top: -9999px;
+    left: -9999px;
+  }
+
+  .responsive-table tr {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    background: #fff;
+    padding: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+
+  .responsive-table td {
+    border: none !important;
+    position: relative;
+    padding: 8px 0 8px 90px !important;
+    text-align: left !important;
+    min-height: 36px;
+  }
+
+  .responsive-table td:before {
+    position: absolute;
+    top: 8px;
+    left: 0;
+    width: 80px;
+    padding-right: 10px;
+    white-space: nowrap;
+    content: attr(data-label);
+    font-weight: bold;
+    color: #6b7280;
+    font-size: 13px;
+  }
+
+  /* Full screen modal adjustments for mobile */
+  .modal-overlay {
+    padding: 0 !important;
+  }
+  .modal-content {
+    border-radius: 0 !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    width: 100vw !important;
+  }
+}

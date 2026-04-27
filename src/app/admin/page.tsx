@@ -92,8 +92,8 @@ export default function AdminDashboard() {
 
   if (!isAuthenticated) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#f3f4f6' }}>
-        <form onSubmit={handleLogin} style={{ background: 'white', padding: '32px', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', width: '320px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#f3f4f6', padding: '16px' }}>
+        <form onSubmit={handleLogin} style={{ background: 'white', padding: '32px', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', width: '100%', maxWidth: '360px' }}>
           <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '24px', textAlign: 'center', color: '#111827' }}>관리자 접속</h1>
           <div style={{ marginBottom: '16px' }}>
             <label style={{ display: 'block', fontSize: '14px', marginBottom: '8px', color: '#4b5563' }}>비밀번호</label>
@@ -132,7 +132,7 @@ export default function AdminDashboard() {
           </button>
         </div>
 
-        <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+        <div className="responsive-table" style={{ background: 'white', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead style={{ background: '#f3f4f6' }}>
               <tr>
@@ -155,8 +155,8 @@ export default function AdminDashboard() {
                 const statusColor = getStatusColor(status);
                 return (
                 <tr key={q.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                  <td style={{ padding: '16px', color: '#111827', fontSize: '14px' }}>{new Date(q.createdAt).toLocaleDateString()} {new Date(q.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
-                  <td style={{ padding: '16px' }}>
+                  <td data-label="접수 일시" style={{ padding: '16px', color: '#111827', fontSize: '14px' }}>{new Date(q.createdAt).toLocaleDateString()} {new Date(q.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                  <td data-label="진행 상태" style={{ padding: '16px' }}>
                     <select 
                       value={status}
                       onChange={(e) => handleStatusChange(q.id, e.target.value)}
@@ -171,7 +171,8 @@ export default function AdminDashboard() {
                         color: statusColor.color,
                         outline: 'none',
                         appearance: 'none',
-                        WebkitAppearance: 'none'
+                        WebkitAppearance: 'none',
+                        minWidth: '130px'
                       }}
                     >
                       <option value="신규 접수">🟢 신규 접수</option>
@@ -181,16 +182,16 @@ export default function AdminDashboard() {
                       <option value="보류/취소">⚫ 보류/취소</option>
                     </select>
                   </td>
-                  <td style={{ padding: '16px', color: '#111827', fontWeight: 500 }}>{q.name}</td>
-                  <td style={{ padding: '16px', color: '#111827' }}>{q.phone}</td>
-                  <td style={{ padding: '16px', color: '#111827' }}>
+                  <td data-label="성함/상호" style={{ padding: '16px', color: '#111827', fontWeight: 500 }}>{q.name}</td>
+                  <td data-label="연락처" style={{ padding: '16px', color: '#111827' }}>{q.phone}</td>
+                  <td data-label="지역/시기" style={{ padding: '16px', color: '#111827' }}>
                     <div>{q.region}</div>
                     <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>{q.expectedDate}</div>
                   </td>
-                  <td style={{ padding: '16px', color: '#111827', fontSize: '13px', maxWidth: '250px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={summarizeEquipments(q.equipments)}>
+                  <td data-label="필요 기구" style={{ padding: '16px', color: '#111827', fontSize: '13px', maxWidth: '250px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={summarizeEquipments(q.equipments)}>
                     {summarizeEquipments(q.equipments)}
                   </td>
-                  <td style={{ padding: '16px' }}>
+                  <td data-label="도면 보기" style={{ padding: '16px' }}>
                     <button 
                       onClick={() => setViewingQuote(q)}
                       style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
@@ -207,8 +208,9 @@ export default function AdminDashboard() {
 
       {/* Floor Plan Viewer Modal */}
       {viewingQuote && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ padding: '16px 24px', background: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px' }}>
+          <div className="modal-content" style={{ width: '100%', maxWidth: '1000px', height: '90vh', background: 'white', borderRadius: '12px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ padding: '16px 24px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <h2 style={{ margin: 0, fontSize: '1.2rem', color: '#111827' }}>{viewingQuote.name} 원장님의 도면</h2>
               <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#6b7280' }}>{viewingQuote.region} / {viewingQuote.expectedDate}</p>
