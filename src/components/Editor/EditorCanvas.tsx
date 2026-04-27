@@ -123,86 +123,96 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
     });
   }, []);
 
-  // Handle pinch-to-zoom (touch)
-  const handleTouchMove = useCallback((e: KonvaEventObject<TouchEvent>) => {
-    e.evt.preventDefault();
-    const touch1 = e.evt.touches[0];
-    const touch2 = e.evt.touches[1];
+  // Native touch event listeners for robust pinch-to-zoom
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
 
-    if (touch1 && touch2) {
-      const stage = stageRef.current;
-      if (!stage) return;
+    const handleTouchMoveNative = (e: TouchEvent) => {
+      e.preventDefault(); // Prevent native scroll/zoom
 
-      if (stage.isDragging()) {
-        stage.stopDrag();
-      }
+      if (e.touches.length >= 2) {
+        const stage = stageRef.current;
+        if (!stage) return;
 
-      const p1 = { x: touch1.clientX, y: touch1.clientY };
-      const p2 = { x: touch2.clientX, y: touch2.clientY };
+        if (stage.isDragging()) {
+          stage.stopDrag();
+        }
 
-      const dist = Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+        const touch1 = e.touches[0];
+        const touch2 = e.touches[1];
 
-      if (!lastDist.current) {
+        const p1 = { x: touch1.clientX, y: touch1.clientY };
+        const p2 = { x: touch2.clientX, y: touch2.clientY };
+
+        const dist = Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+
+        if (!lastDist.current) {
+          lastDist.current = dist;
+        }
+
+        const center = {
+          x: (p1.x + p2.x) / 2,
+          y: (p1.y + p2.y) / 2,
+        };
+
+        if (!lastCenter.current) {
+          lastCenter.current = center;
+          return;
+        }
+
+        const oldScale = stage.scaleX();
+        const scaleBy = dist / lastDist.current;
+        const newScale = oldScale * scaleBy;
+
+        if (newScale < 0.1 || newScale > 10) {
+          lastDist.current = dist;
+          lastCenter.current = center;
+          return;
+        }
+
+        const containerRect = container.getBoundingClientRect();
+        const stageCenterX = center.x - containerRect.left;
+        const stageCenterY = center.y - containerRect.top;
+
+        const mousePointTo = {
+          x: stageCenterX / oldScale - stage.x() / oldScale,
+          y: stageCenterY / oldScale - stage.y() / oldScale,
+        };
+
+        const newPos = {
+          x: stageCenterX - mousePointTo.x * newScale + (center.x - lastCenter.current.x),
+          y: stageCenterY - mousePointTo.y * newScale + (center.y - lastCenter.current.y),
+        };
+
+        // Apply directly to stage for smooth rapid updates before React re-renders
+        stage.scale({ x: newScale, y: newScale });
+        stage.position(newPos);
+        stage.batchDraw();
+
+        // Keep React state in sync
+        setScale(newScale);
+        setPosition(newPos);
+
         lastDist.current = dist;
-      }
-
-      const center = {
-        x: (p1.x + p2.x) / 2,
-        y: (p1.y + p2.y) / 2,
-      };
-
-      if (!lastCenter.current) {
         lastCenter.current = center;
-        return;
       }
+    };
 
-      const oldScale = stage.scaleX();
-      const scaleBy = dist / lastDist.current;
-      const newScale = oldScale * scaleBy;
+    const handleTouchEndNative = () => {
+      lastDist.current = 0;
+      lastCenter.current = null;
+    };
 
-      if (newScale < 0.1 || newScale > 10) {
-        lastDist.current = dist;
-        lastCenter.current = center;
-        return;
-      }
+    container.addEventListener('touchmove', handleTouchMoveNative, { passive: false, capture: true });
+    container.addEventListener('touchend', handleTouchEndNative, { capture: true });
+    container.addEventListener('touchcancel', handleTouchEndNative, { capture: true });
 
-      // calculate pointer position relative to stage
-      // Note: touch positions are relative to viewport. We need to account for container position if it's not full screen, 
-      // but assuming the container is full screen or using clientX/Y directly for scale is close enough for relative movement.
-      // A more robust way is to use stage.getPointerPosition() if it was correctly updated, but Konva might not update it on multitouch perfectly.
-      // We will use standard Konva math:
-      
-      const containerRect = containerRef.current?.getBoundingClientRect();
-      const stageCenterX = containerRect ? center.x - containerRect.left : center.x;
-      const stageCenterY = containerRect ? center.y - containerRect.top : center.y;
-
-      const mousePointTo = {
-        x: stageCenterX / oldScale - stage.x() / oldScale,
-        y: stageCenterY / oldScale - stage.y() / oldScale,
-      };
-
-      const newPos = {
-        x: stageCenterX - mousePointTo.x * newScale + (center.x - lastCenter.current.x),
-        y: stageCenterY - mousePointTo.y * newScale + (center.y - lastCenter.current.y),
-      };
-
-      // Apply directly to stage for smooth rapid updates before React re-renders
-      stage.scale({ x: newScale, y: newScale });
-      stage.position(newPos);
-      stage.batchDraw();
-
-      // Keep React state in sync
-      setScale(newScale);
-      setPosition(newPos);
-
-      lastDist.current = dist;
-      lastCenter.current = center;
-    }
-  }, []);
-
-  const handleTouchEnd = useCallback(() => {
-    lastDist.current = 0;
-    lastCenter.current = null;
+    return () => {
+      container.removeEventListener('touchmove', handleTouchMoveNative, { capture: true });
+      container.removeEventListener('touchend', handleTouchEndNative, { capture: true });
+      container.removeEventListener('touchcancel', handleTouchEndNative, { capture: true });
+    };
   }, []);
 
   return (
@@ -219,8 +229,6 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
           onWheel={handleWheel}
           onMouseDown={checkDeselect}
           onTouchStart={checkDeselect}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
           draggable
           onDragEnd={(e) => {
             // Only update if it's the stage being dragged, not an equipment
