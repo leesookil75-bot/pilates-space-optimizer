@@ -68,28 +68,28 @@ export function generateAILayout(params: AILayoutParams): { rooms: RoomData[], e
   let requiredAreaPx = 0;
   
   // Packing logic: We will place rooms sequentially from top-left, wrapping to next row if needed.
-  let currentX = startX + 50; // 1m padding from outer wall
-  let currentY = startY + 50;
+  let currentX = startX; // Start exactly at the outer wall border
+  let currentY = startY;
   let rowMaxHeight = 0;
 
   const placeBlock = (name: string, w: number, h: number, color: string, itemsFn: (rx: number, ry: number) => void) => {
     // Check if it fits in current row
-    if (currentX + w > startX + outerWidthPx - 50) {
-      // Move to next row
-      currentX = startX + 50;
-      currentY += rowMaxHeight + 50;
+    if (currentX + w > startX + outerWidthPx) {
+      // Move to next row tightly
+      currentX = startX;
+      currentY += rowMaxHeight;
       rowMaxHeight = 0;
     }
     
     // Check if it fits vertically
-    if (currentY + h > startY + outerHeightPx - 50) {
+    if (currentY + h > startY + outerHeightPx) {
       return false; // Does not fit!
     }
 
     rooms.push(createRoom(name, 'inner', currentX, currentY, w, h, color));
     itemsFn(currentX, currentY);
 
-    currentX += w + 50; // Advance X
+    currentX += w; // Advance X tightly with 0 gap
     if (h > rowMaxHeight) rowMaxHeight = h;
     requiredAreaPx += (w * h);
     return true;
