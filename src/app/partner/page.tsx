@@ -17,6 +17,7 @@ export default function PartnerDashboard() {
   const [settings, setSettings] = useState<any>(null);
   const [chargeModalOpen, setChargeModalOpen] = useState(false);
   const [depositorName, setDepositorName] = useState('');
+  const [selectedPackage, setSelectedPackage] = useState<'30k' | '50k' | '100k'>('50k');
   const [requestingCharge, setRequestingCharge] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -35,7 +36,7 @@ export default function PartnerDashboard() {
       const res = await fetch('/api/partner/charge-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ partnerId, password, depositorName })
+        body: JSON.stringify({ partnerId, password, depositorName, selectedPackage })
       });
       
       if (res.ok) {
@@ -408,25 +409,81 @@ export default function PartnerDashboard() {
       {/* Charge Modal */}
       {chargeModalOpen && (
         <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
-          <div style={{ background: 'white', borderRadius: '12px', width: '100%', maxWidth: '450px', padding: '32px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#0f172a', margin: '0 0 16px 0', textAlign: 'center' }}>코인 충전 안내</h2>
-            
-            <div style={{ background: '#f8fafc', padding: '24px', borderRadius: '8px', marginBottom: '24px', border: '1px solid #e2e8f0' }}>
-              <p style={{ fontSize: '14px', color: '#475569', marginBottom: '16px', lineHeight: 1.6, textAlign: 'center' }}>
-                연락처와 도면을 열람하려면 코인이 필요합니다.<br/>
-                아래 계좌로 입금해 주시면 확인 후 즉시 충전해 드립니다.
-              </p>
+          <div style={{ background: 'white', borderRadius: '12px', width: '100%', maxWidth: '500px', padding: '32px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#0f172a', margin: '0 0 8px 0', textAlign: 'center' }}>코인 충전 패키지</h2>
+            <p style={{ fontSize: '14px', color: '#64748b', textAlign: 'center', marginBottom: '24px' }}>연락처와 도면을 열람하려면 코인이 필요합니다.</p>
+
+            {/* Package Selection */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
               
-              <div style={{ background: 'white', padding: '16px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
-                <p style={{ margin: '0 0 8px 0', fontSize: '15px', color: '#0f172a' }}><strong>은행:</strong> {settings?.bankName}</p>
-                <p style={{ margin: '0 0 8px 0', fontSize: '15px', color: '#0f172a' }}><strong>계좌번호:</strong> {settings?.bankAccount}</p>
-                <p style={{ margin: '0', fontSize: '15px', color: '#0f172a' }}><strong>예금주:</strong> {settings?.bankOwner}</p>
+              {/* 30k Package */}
+              <div 
+                onClick={() => setSelectedPackage('30k')}
+                style={{ border: selectedPackage === '30k' ? '2px solid #3b82f6' : '1px solid #cbd5e1', borderRadius: '8px', padding: '16px', cursor: 'pointer', background: selectedPackage === '30k' ? '#eff6ff' : 'white', transition: 'all 0.2s', position: 'relative' }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '16px', color: '#0f172a', fontWeight: 'bold' }}>베이직 패키지</h3>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '14px', color: '#64748b' }}>30,000원 입금</p>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#3b82f6' }}>3,000</span>
+                    <span style={{ fontSize: '14px', color: '#64748b', marginLeft: '4px' }}>코인</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 50k Package */}
+              <div 
+                onClick={() => setSelectedPackage('50k')}
+                style={{ border: selectedPackage === '50k' ? '2px solid #3b82f6' : '1px solid #cbd5e1', borderRadius: '8px', padding: '16px', cursor: 'pointer', background: selectedPackage === '50k' ? '#eff6ff' : 'white', transition: 'all 0.2s', position: 'relative' }}
+              >
+                <div style={{ position: 'absolute', top: '-10px', right: '16px', background: '#ec4899', color: 'white', fontSize: '11px', fontWeight: 'bold', padding: '4px 8px', borderRadius: '12px', boxShadow: '0 2px 4px rgba(236,72,153,0.3)' }}>
+                  🎁 1만원 보너스
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '16px', color: '#0f172a', fontWeight: 'bold' }}>프로 패키지</h3>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '14px', color: '#64748b' }}>50,000원 입금</p>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <span style={{ fontSize: '24px', fontWeight: 'bold', color: '#3b82f6' }}>6,000</span>
+                    <span style={{ fontSize: '14px', color: '#64748b', marginLeft: '4px' }}>코인</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 100k Package */}
+              <div 
+                onClick={() => setSelectedPackage('100k')}
+                style={{ border: selectedPackage === '100k' ? '2px solid #3b82f6' : '1px solid #cbd5e1', borderRadius: '8px', padding: '16px', cursor: 'pointer', background: selectedPackage === '100k' ? '#eff6ff' : 'white', transition: 'all 0.2s', position: 'relative' }}
+              >
+                <div style={{ position: 'absolute', top: '-10px', right: '16px', background: '#f59e0b', color: 'white', fontSize: '11px', fontWeight: 'bold', padding: '4px 8px', borderRadius: '12px', boxShadow: '0 2px 4px rgba(245,158,11,0.3)' }}>
+                  🚀 3만원 보너스 (BEST)
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '16px', color: '#0f172a', fontWeight: 'bold' }}>프리미엄 패키지</h3>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '14px', color: '#64748b' }}>100,000원 입금</p>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <span style={{ fontSize: '24px', fontWeight: 'bold', color: '#3b82f6' }}>13,000</span>
+                    <span style={{ fontSize: '14px', color: '#64748b', marginLeft: '4px' }}>코인</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+            
+            <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '8px', marginBottom: '24px', border: '1px solid #e2e8f0' }}>
+              <p style={{ fontSize: '13px', color: '#475569', marginBottom: '12px', textAlign: 'center', fontWeight: 'bold' }}>
+                선택하신 금액을 아래 계좌로 입금해 주세요.
+              </p>
+              <div style={{ background: 'white', padding: '16px', borderRadius: '6px', border: '1px solid #cbd5e1', textAlign: 'center' }}>
+                <p style={{ margin: '0 0 8px 0', fontSize: '15px', color: '#0f172a' }}><strong>{settings?.bankName}</strong> {settings?.bankAccount}</p>
+                <p style={{ margin: '0', fontSize: '15px', color: '#0f172a' }}>예금주: <strong>{settings?.bankOwner}</strong></p>
               </div>
             </div>
-
-            <p style={{ fontSize: '13px', color: '#ef4444', textAlign: 'center', marginBottom: '24px', fontWeight: 'bold' }}>
-              * 카카오톡으로 문의하시거나, 아래에서 입금 확인을 요청해 주세요.
-            </p>
 
             <div style={{ background: '#f1f5f9', padding: '16px', borderRadius: '8px', marginBottom: '24px' }}>
               <label style={{ display: 'block', fontSize: '14px', fontWeight: 'bold', color: '#334155', marginBottom: '8px' }}>입금하신 분의 성함 (입금자명)</label>
@@ -446,6 +503,9 @@ export default function PartnerDashboard() {
                   {requestingCharge ? '전송 중...' : '🚀 확인 요청'}
                 </button>
               </div>
+              <p style={{ fontSize: '12px', color: '#64748b', marginTop: '8px', marginBottom: 0 }}>
+                * 입금 후 확인 요청을 누르시면 관리자에게 실시간 알림이 전송됩니다.
+              </p>
             </div>
 
             <button 
