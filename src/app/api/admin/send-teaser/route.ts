@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
-    const { password, quoteId, targetEmails } = await req.json();
+    const { password, quoteId, targetEmails, teaserType } = await req.json();
 
     // Check master password
     if (password !== process.env.NEXT_PUBLIC_ADMIN_PASSWORD) {
@@ -62,11 +62,52 @@ export async function POST(req: Request) {
     let successCount = 0;
     
     for (const email of targetEmails) {
-      const mailOptions = {
-        from: `"필라테스 기구 견적 관리자" <${process.env.EMAIL_USER}>`,
-        to: email, // 개별 수신자
-        subject: `[필라테스 기구 견적요청] ${region} 지역 신규 오픈 건`,
-        html: `
+      let subject = '';
+      let htmlContent = '';
+
+      if (teaserType === 'interior') {
+        subject = `[필라테스 인테리어 견적요청] ${region} 지역 신규 센터 시공 건`;
+        htmlContent = `
+          <div style="font-family: 'Malgun Gothic', sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+            <div style="background-color: #111827; padding: 24px; text-align: center;">
+              <h1 style="color: white; margin: 0; font-size: 24px;">새로운 인테리어 견적 요청</h1>
+            </div>
+            <div style="padding: 32px; background-color: #ffffff;">
+              <p style="font-size: 16px; color: #374151; line-height: 1.6;">
+                안녕하세요, 대표님!<br/><br/>
+                <strong>${region}</strong> 지역에서 새로운 필라테스 센터 오픈을 위한 인테리어 시공 견적 요청이 접수되었습니다.
+              </p>
+              
+              <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 24px 0;">
+                <h3 style="margin-top: 0; margin-bottom: 12px; color: #111827;">📌 요청 요약 정보</h3>
+                <ul style="margin: 0; padding-left: 20px; color: #4b5563; line-height: 1.8;">
+                  <li><strong>시공 예정 지역:</strong> ${region}</li>
+                  <li><strong>오픈 예정 시기:</strong> ${expectedDate}</li>
+                </ul>
+              </div>
+              
+              <p style="font-size: 15px; color: #ef4444; font-weight: bold; text-align: center; margin-bottom: 24px;">
+                * 고객이 직접 작성한 상세 도면(레이아웃)과 공간 정보, 연락처는 파트너 가입 후 확인하실 수 있습니다.
+              </p>
+
+              <div style="text-align: center; margin: 32px 0;">
+                <a href="${appUrl}/partner" style="background-color: #3b82f6; color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block;">
+                  👉 파트너 가입하고 도면 레이아웃 확인하기
+                </a>
+              </div>
+            </div>
+            <div style="background-color: #f9fafb; padding: 16px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0; font-size: 12px; color: #9ca3af; line-height: 1.5;">
+                본 메일은 인테리어 및 기구 제휴사 시범 운영 안내를 위해 발송되었습니다.<br/>
+                발신 전용이며, 문의사항이 있으시면 고객센터로 연락 바랍니다.
+              </p>
+            </div>
+          </div>
+        `;
+      } else {
+        // default: equipment
+        subject = `[필라테스 기구 견적요청] ${region} 지역 신규 오픈 건`;
+        htmlContent = `
           <div style="font-family: 'Malgun Gothic', sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
             <div style="background-color: #111827; padding: 24px; text-align: center;">
               <h1 style="color: white; margin: 0; font-size: 24px;">새로운 견적 요청</h1>
@@ -103,7 +144,14 @@ export async function POST(req: Request) {
               </p>
             </div>
           </div>
-        `,
+        `;
+      }
+
+      const mailOptions = {
+        from: `"필라테스 스페이스 관리자" <${process.env.EMAIL_USER}>`,
+        to: email, // 개별 수신자
+        subject: subject,
+        html: htmlContent,
       };
 
       try {

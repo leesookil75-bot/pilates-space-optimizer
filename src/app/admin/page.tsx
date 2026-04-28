@@ -17,10 +17,10 @@ export default function AdminDashboard() {
   // Floor plan viewer state
   const [viewingQuote, setViewingQuote] = useState<any | null>(null);
 
-  // Teaser email modal state
   const [teaserModalOpen, setTeaserModalOpen] = useState(false);
   const [selectedQuoteForTeaser, setSelectedQuoteForTeaser] = useState<any | null>(null);
   const [teaserEmails, setTeaserEmails] = useState('');
+  const [teaserType, setTeaserType] = useState<'equipment' | 'interior'>('equipment');
   const [sendingTeaser, setSendingTeaser] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -118,7 +118,8 @@ export default function AdminDashboard() {
         body: JSON.stringify({ 
           password, 
           quoteId: selectedQuoteForTeaser.id, 
-          targetEmails: emailsList 
+          targetEmails: emailsList,
+          teaserType
         })
       });
       
@@ -415,6 +416,34 @@ export default function AdminDashboard() {
               아직 가입하지 않은 잠재 제휴사들의 가입을 유도합니다.<br/>
               (고객 연락처와 상세 도면은 이메일에 포함되지 않습니다.)
             </p>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: 'bold', color: '#374151', marginBottom: '8px' }}>
+                발송 목적 (타겟 업체)
+              </label>
+              <div style={{ display: 'flex', gap: '16px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <input 
+                    type="radio" 
+                    name="teaserType" 
+                    value="equipment" 
+                    checked={teaserType === 'equipment'} 
+                    onChange={() => setTeaserType('equipment')} 
+                  />
+                  <span>기구 견적 업체용</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <input 
+                    type="radio" 
+                    name="teaserType" 
+                    value="interior" 
+                    checked={teaserType === 'interior'} 
+                    onChange={() => setTeaserType('interior')} 
+                  />
+                  <span>인테리어 시공 업체용</span>
+                </label>
+              </div>
+            </div>
 
             <div style={{ marginBottom: '24px' }}>
               <label style={{ display: 'block', fontSize: '14px', fontWeight: 'bold', color: '#374151', marginBottom: '8px' }}>
