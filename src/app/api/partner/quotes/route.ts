@@ -30,18 +30,34 @@ export async function POST(req: Request) {
     // Fetch quotes
     const snapshot = await adminDb.collection('quote_requests').orderBy('createdAt', 'desc').get();
     
-    // Mask contact information (B approach)
+    // Fetch settings
+    const settingsDoc = await adminDb.collection('settings').doc('systemConfig').get();
+    const settings = settingsDoc.exists ? settingsDoc.data() : { bankName: '우리은행', bankAccount: '1002352696292', bankOwner: '이수길', unlockCost: 1000 };
+
+    // Mask contact information if not unlocked
+    const unlockedQuotes = partnerData.unlockedQuotes || [];
+
     const quotes = snapshot.docs.map(doc => {
       const data = doc.data();
-      return {
-        id: doc.id,
-        ...data,
-        name: data.name ? data.name[0] + '*'.repeat(data.name.length - 1) : '***', // 홍**
-        phone: data.phone ? data.phone.substring(0, 4) + '****-****' : '010-****-****',
-      };
+      const isUnlocked = unlockedQuotes.includes(doc.id);
+
+      if (isUnlocked) {
+        return { id: doc.id, ...data }; // Return full data if unlocked
+      } else {
+        return {
+          id: doc.id,
+          ...data,
+          name: data.name ? data.name[0] + '*'.repeat(data.name.length - 1) : '***',
+          phone: data.phone ? data.phone.substring(0, 4) + '****-****' : '010-****-****',
+        };
+      }
     });
 
-    return NextResponse.json({ quotes });
+    return NextResponse.json({ 
+      quotes, 
+      partner: { coins: partnerData.coins || 0, unlockedQuotes },
+      settings 
+    });
   } catch (error: any) {
     console.error('Error fetching quotes:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

@@ -27,6 +27,8 @@ export async function POST(req: Request) {
       businessNumber: businessNumber || '',
       status: 'pending', // pending, approved, rejected
       createdAt: new Date().toISOString(),
+      coins: 0,
+      unlockedQuotes: [],
     };
 
     await adminDb.collection('partners').add(newPartner);

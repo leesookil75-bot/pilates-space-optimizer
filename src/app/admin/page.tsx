@@ -12,7 +12,8 @@ export default function AdminDashboard() {
   const [partners, setPartners] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'quotes' | 'partners'>('quotes');
+  const [activeTab, setActiveTab] = useState<'quotes' | 'partners' | 'settings'>('quotes');
+  const [settings, setSettings] = useState<any>(null);
   
   // Floor plan viewer state
   const [viewingQuote, setViewingQuote] = useState<any | null>(null);
@@ -44,10 +45,14 @@ export default function AdminDashboard() {
       });
       const partnerData = await partnerRes.json();
       
+      const settingsRes = await fetch('/api/admin/settings');
+      const settingsData = await settingsRes.json();
+      
       if (res.ok) {
         setIsAuthenticated(true);
         setQuotes(data.quotes || []);
         setPartners(partnerData.partners || []);
+        setSettings(settingsData);
       } else {
         setError('비밀번호가 올바르지 않습니다.');
       }
@@ -55,6 +60,52 @@ export default function AdminDashboard() {
       setError('서버 통신 오류');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUpdateSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!confirm('설정을 저장하시겠습니까?')) return;
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, settings })
+      });
+      if (res.ok) {
+        alert('설정이 성공적으로 저장되었습니다.');
+      } else {
+        alert('설정 저장 실패');
+      }
+    } catch (err) {
+      alert('오류 발생');
+    }
+  };
+
+  const handleChargeCoins = async (partnerId: string, currentCoins: number) => {
+    const amountStr = prompt(`현재 보유 코인: ${currentCoins || 0}개\n추가하거나 차감할 코인 개수를 입력하세요. (차감하려면 - 붙이기)\n예: 1000`);
+    if (!amountStr) return;
+    
+    const amount = parseInt(amountStr, 10);
+    if (isNaN(amount)) {
+      alert('숫자만 입력해 주세요.');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/admin/partners/coin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, partnerDocId: partnerId, amount })
+      });
+      if (res.ok) {
+        setPartners(prev => prev.map(p => p.id === partnerId ? { ...p, coins: (p.coins || 0) + amount } : p));
+        alert('코인이 업데이트 되었습니다.');
+      } else {
+        alert('코인 업데이트 실패');
+      }
+    } catch (err) {
+      alert('서버 통신 오류');
     }
   };
 
@@ -233,9 +284,62 @@ export default function AdminDashboard() {
           >
             🤝 제휴사 파트너 관리
           </button>
+          <button 
+            onClick={() => setActiveTab('settings')}
+            style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold', background: activeTab === 'settings' ? '#111827' : 'white', color: activeTab === 'settings' ? 'white' : '#4b5563', boxShadow: activeTab === 'settings' ? 'none' : '0 1px 2px rgba(0,0,0,0.05)' }}
+          >
+            ⚙️ 시스템 설정
+          </button>
         </div>
 
-        {activeTab === 'quotes' ? (
+        {activeTab === 'settings' ? (
+          <div style={{ background: 'white', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', padding: '32px', maxWidth: '600px' }}>
+            <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#111827', marginBottom: '24px' }}>플랫폼 전역 설정</h2>
+            {settings && (
+              <form onSubmit={handleUpdateSettings}>
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: 'bold', color: '#374151', marginBottom: '8px' }}>무통장 입금 은행명</label>
+                  <input 
+                    type="text" 
+                    value={settings.bankName}
+                    onChange={e => setSettings({...settings, bankName: e.target.value})}
+                    style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #d1d5db' }}
+                  />
+                </div>
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: 'bold', color: '#374151', marginBottom: '8px' }}>계좌번호</label>
+                  <input 
+                    type="text" 
+                    value={settings.bankAccount}
+                    onChange={e => setSettings({...settings, bankAccount: e.target.value})}
+                    style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #d1d5db' }}
+                  />
+                </div>
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: 'bold', color: '#374151', marginBottom: '8px' }}>예금주</label>
+                  <input 
+                    type="text" 
+                    value={settings.bankOwner}
+                    onChange={e => setSettings({...settings, bankOwner: e.target.value})}
+                    style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #d1d5db' }}
+                  />
+                </div>
+                <div style={{ marginBottom: '32px' }}>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: 'bold', color: '#374151', marginBottom: '8px' }}>오더 1건당 열람 차감 코인 (기본: 1000)</label>
+                  <input 
+                    type="number" 
+                    value={settings.unlockCost}
+                    onChange={e => setSettings({...settings, unlockCost: parseInt(e.target.value) || 0})}
+                    style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #d1d5db' }}
+                  />
+                </div>
+                <button type="submit" style={{ background: '#3b82f6', color: 'white', fontWeight: 'bold', padding: '12px 24px', borderRadius: '8px', border: 'none', cursor: 'pointer', width: '100%' }}>
+                  설정 저장하기
+                </button>
+              </form>
+            )}
+          </div>
+        ) : activeTab === 'quotes' ? (
         <div className="responsive-table" style={{ background: 'white', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead style={{ background: '#f3f4f6' }}>
@@ -327,12 +431,13 @@ export default function AdminDashboard() {
                 <th style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontSize: '14px' }}>담당자 성함</th>
                 <th style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontSize: '14px' }}>연락처</th>
                 <th style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontSize: '14px' }}>사업자등록번호</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontSize: '14px' }}>보유 코인 (충전)</th>
               </tr>
             </thead>
             <tbody>
               {partners.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>가입한 파트너가 없습니다.</td>
+                  <td colSpan={7} style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>가입한 파트너가 없습니다.</td>
                 </tr>
               ) : partners.map(p => {
                 const partnerColor = getPartnerStatusColor(p.status);
@@ -367,6 +472,17 @@ export default function AdminDashboard() {
                   <td data-label="담당자 성함" style={{ padding: '16px', color: '#111827' }}>{p.contactName}</td>
                   <td data-label="연락처" style={{ padding: '16px', color: '#111827' }}>{p.phone}</td>
                   <td data-label="사업자등록번호" style={{ padding: '16px', color: '#111827' }}>{p.businessNumber || '-'}</td>
+                  <td data-label="보유 코인" style={{ padding: '16px', color: '#111827' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontWeight: 'bold', color: '#3b82f6' }}>{p.coins || 0}</span>
+                      <button 
+                        onClick={() => handleChargeCoins(p.id, p.coins || 0)}
+                        style={{ background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: '4px', padding: '4px 8px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold' }}
+                      >
+                        수동충전
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               )})}
             </tbody>

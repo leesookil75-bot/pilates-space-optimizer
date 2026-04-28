@@ -13,6 +13,9 @@ export default function PartnerDashboard() {
   
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [quotes, setQuotes] = useState<any[]>([]);
+  const [partnerData, setPartnerData] = useState<any>(null);
+  const [settings, setSettings] = useState<any>(null);
+  const [chargeModalOpen, setChargeModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
@@ -36,6 +39,8 @@ export default function PartnerDashboard() {
       if (res.ok) {
         setIsAuthenticated(true);
         setQuotes(data.quotes || []);
+        setPartnerData(data.partner);
+        setSettings(data.settings);
       } else {
         setError(data.error || '로그인 실패');
       }
@@ -73,8 +78,54 @@ export default function PartnerDashboard() {
     }
   };
 
-  const handleRequestContact = () => {
-    alert('이 기능은 실제 서비스 오픈 시 과금(또는 포인트 차감) 후 고객의 원본 연락처를 열람할 수 있는 기능입니다. 현재는 테스트 모드입니다.');
+  const handleUnlockQuote = async (quoteId: string) => {
+    if (!settings || !partnerData) return;
+    const cost = settings.unlockCost || 1000;
+    
+    if (partnerData.coins < cost) {
+      setChargeModalOpen(true);
+      return;
+    }
+
+    if (!confirm(`이 오더의 상세 정보를 열람하시겠습니까?\n(보유 코인에서 ${cost}코인이 차감됩니다.)`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/partner/unlock-quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ partnerId, password, quoteId })
+      });
+      const data = await res.json();
+      
+      if (res.ok) {
+        alert('열람 권한을 구매했습니다!');
+        // Update local state: subtract coins, add to unlocked
+        setPartnerData({
+          ...partnerData,
+          coins: data.remainingCoins,
+          unlockedQuotes: [...(partnerData.unlockedQuotes || []), quoteId]
+        });
+        
+        // Refetch quotes to get the unmasked data
+        const refreshRes = await fetch('/api/partner/quotes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ partnerId, password })
+        });
+        const refreshData = await refreshRes.json();
+        if (refreshRes.ok) setQuotes(refreshData.quotes || []);
+      } else {
+        if (data.error === 'Insufficient coins') {
+          setChargeModalOpen(true);
+        } else {
+          alert(data.error || '구매 실패');
+        }
+      }
+    } catch (err) {
+      alert('서버 통신 오류');
+    }
   };
 
   const summarizeEquipments = (equipments: any[]) => {
@@ -210,12 +261,25 @@ export default function PartnerDashboard() {
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <h1 style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#0f172a' }}>🤝 제휴사 파트너 오더 현황</h1>
-          <button 
-            onClick={() => { setIsAuthenticated(false); setPassword(''); setQuotes([]); }}
-            style={{ padding: '8px 16px', background: 'white', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer' }}
-          >
-            로그아웃
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {partnerData && (
+              <div style={{ background: 'white', padding: '8px 16px', borderRadius: '8px', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '15px', fontWeight: 'bold', color: '#0f172a' }}>💰 내 코인: <span style={{ color: '#3b82f6' }}>{partnerData.coins || 0}</span>개</span>
+                <button 
+                  onClick={() => setChargeModalOpen(true)}
+                  style={{ background: '#f8fafc', border: '1px solid #cbd5e1', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', color: '#475569' }}
+                >
+                  충전 안내
+                </button>
+              </div>
+            )}
+            <button 
+              onClick={() => { setIsAuthenticated(false); setPassword(''); setQuotes([]); setPartnerData(null); }}
+              style={{ padding: '8px 16px', background: 'white', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', color: '#475569' }}
+            >
+              로그아웃
+            </button>
+          </div>
         </div>
 
         <div className="responsive-table" style={{ background: 'white', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
@@ -236,7 +300,9 @@ export default function PartnerDashboard() {
                 <tr>
                   <td colSpan={7} style={{ padding: '32px', textAlign: 'center', color: '#64748b' }}>현재 진행 중인 오더가 없습니다.</td>
                 </tr>
-              ) : quotes.map(q => (
+              ) : quotes.map(q => {
+                const isUnlocked = partnerData?.unlockedQuotes?.includes(q.id);
+                return (
                 <tr key={q.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                   <td data-label="접수 일시" style={{ padding: '16px', color: '#0f172a', fontSize: '14px' }}>{new Date(q.createdAt).toLocaleDateString()}</td>
                   <td data-label="진행 상태" style={{ padding: '16px' }}>{getStatusBadge(q.status)}</td>
@@ -244,29 +310,35 @@ export default function PartnerDashboard() {
                   <td data-label="오픈 시기" style={{ padding: '16px', color: '#64748b' }}>{q.expectedDate}</td>
                   <td data-label="고객 정보" style={{ padding: '16px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
-                      <span style={{ fontSize: '13px', color: '#0f172a' }}>{q.name}</span>
-                      <span style={{ fontSize: '13px', color: '#0f172a' }}>{q.phone}</span>
-                      <button 
-                        onClick={handleRequestContact}
-                        style={{ marginTop: '4px', background: '#fff', border: '1px solid #3b82f6', color: '#3b82f6', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer' }}
-                      >
-                        연락처 열람하기
-                      </button>
+                      <span style={{ fontSize: '13px', color: '#0f172a', fontWeight: isUnlocked ? 'bold' : 'normal' }}>{q.name}</span>
+                      <span style={{ fontSize: '13px', color: '#0f172a', fontWeight: isUnlocked ? 'bold' : 'normal' }}>{q.phone}</span>
+                      {!isUnlocked && (
+                        <button 
+                          onClick={() => handleUnlockQuote(q.id)}
+                          style={{ marginTop: '4px', background: '#3b82f6', border: 'none', color: 'white', padding: '6px 10px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold' }}
+                        >
+                          🔓 {settings?.unlockCost || 1000} 코인으로 열람하기
+                        </button>
+                      )}
                     </div>
                   </td>
                   <td data-label="필요 기구" style={{ padding: '16px', color: '#0f172a', fontSize: '13px', maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={summarizeEquipments(q.equipments)}>
                     {summarizeEquipments(q.equipments)}
                   </td>
                   <td data-label="도면 보기" style={{ padding: '16px' }}>
-                    <button 
-                      onClick={() => setViewingQuote(q)}
-                      style={{ background: '#10b981', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}
-                    >
-                      도면 확인
-                    </button>
+                    {isUnlocked ? (
+                      <button 
+                        onClick={() => setViewingQuote(q)}
+                        style={{ background: '#10b981', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}
+                      >
+                        도면 열람
+                      </button>
+                    ) : (
+                      <span style={{ fontSize: '13px', color: '#94a3b8' }}>🔒 연락처 열람 시 잠금해제</span>
+                    )}
                   </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         </div>
@@ -300,6 +372,39 @@ export default function PartnerDashboard() {
             />
           </div>
         </div>
+        </div>
+      )}
+
+      {/* Charge Modal */}
+      {chargeModalOpen && (
+        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div style={{ background: 'white', borderRadius: '12px', width: '100%', maxWidth: '450px', padding: '32px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#0f172a', margin: '0 0 16px 0', textAlign: 'center' }}>코인 충전 안내</h2>
+            
+            <div style={{ background: '#f8fafc', padding: '24px', borderRadius: '8px', marginBottom: '24px', border: '1px solid #e2e8f0' }}>
+              <p style={{ fontSize: '14px', color: '#475569', marginBottom: '16px', lineHeight: 1.6, textAlign: 'center' }}>
+                연락처와 도면을 열람하려면 코인이 필요합니다.<br/>
+                아래 계좌로 입금해 주시면 확인 후 즉시 충전해 드립니다.
+              </p>
+              
+              <div style={{ background: 'white', padding: '16px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
+                <p style={{ margin: '0 0 8px 0', fontSize: '15px', color: '#0f172a' }}><strong>은행:</strong> {settings?.bankName}</p>
+                <p style={{ margin: '0 0 8px 0', fontSize: '15px', color: '#0f172a' }}><strong>계좌번호:</strong> {settings?.bankAccount}</p>
+                <p style={{ margin: '0', fontSize: '15px', color: '#0f172a' }}><strong>예금주:</strong> {settings?.bankOwner}</p>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '13px', color: '#ef4444', textAlign: 'center', marginBottom: '24px', fontWeight: 'bold' }}>
+              * 입금 후 우측 하단의 카카오톡으로 입금자명과 업체를 꼭 남겨주세요!
+            </p>
+
+            <button 
+              onClick={() => setChargeModalOpen(false)}
+              style={{ width: '100%', padding: '14px', background: '#1e293b', border: 'none', borderRadius: '8px', color: 'white', fontWeight: 'bold', cursor: 'pointer', fontSize: '15px' }}
+            >
+              확인했습니다 (닫기)
+            </button>
+          </div>
         </div>
       )}
     </div>
