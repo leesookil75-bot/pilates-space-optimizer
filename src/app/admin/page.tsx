@@ -325,11 +325,20 @@ export default function AdminDashboard() {
                   />
                 </div>
                 <div style={{ marginBottom: '20px' }}>
-                  <label style={{ display: 'block', fontSize: '14px', fontWeight: 'bold', color: '#374151', marginBottom: '8px' }}>오더 1건당 열람 차감 코인 (기본: 1000)</label>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: 'bold', color: '#374151', marginBottom: '8px' }}>연락처 및 상세 도면 열람 차감 코인 (기본: 20000)</label>
                   <input 
                     type="number" 
                     value={settings.unlockCost}
                     onChange={e => setSettings({...settings, unlockCost: parseInt(e.target.value) || 0})}
+                    style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #d1d5db' }}
+                  />
+                </div>
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: 'bold', color: '#374151', marginBottom: '8px' }}>견적서만 이메일 발송 차감 코인 (기본: 5000)</label>
+                  <input 
+                    type="number" 
+                    value={settings.estimateCost || 5000}
+                    onChange={e => setSettings({...settings, estimateCost: parseInt(e.target.value) || 0})}
                     style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #d1d5db' }}
                   />
                 </div>

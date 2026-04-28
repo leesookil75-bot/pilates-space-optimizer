@@ -24,12 +24,22 @@ export async function POST(req: Request) {
 
     const partnerData = partnerSnapshot.docs[0].data();
 
-    // 2. Check if partner has unlocked this quote
-    if (!partnerData.unlockedQuotes?.includes(quoteId)) {
-      return NextResponse.json({ error: '견적서를 발송하려면 먼저 오더를 열람(구매)해야 합니다.' }, { status: 403 });
+    // 2. Fetch settings for estimateCost
+    const settingsDoc = await adminDb.collection('settings').doc('systemConfig').get();
+    const settings = settingsDoc.exists ? settingsDoc.data() : null;
+    const estimateCost = settings?.estimateCost || 5000;
+
+    // 3. Check if already estimated or unlocked
+    const isUnlocked = partnerData.unlockedQuotes?.includes(quoteId);
+    const isEstimated = partnerData.estimatedQuotes?.includes(quoteId);
+    const isFreeToSend = isUnlocked || isEstimated;
+
+    // 4. Check coin balance if not free
+    if (!isFreeToSend && (partnerData.coins || 0) < estimateCost) {
+      return NextResponse.json({ error: `견적 발송에 필요한 코인이 부족합니다. (필요: ${estimateCost} 코인, 보유: ${partnerData.coins || 0} 코인)` }, { status: 403 });
     }
 
-    // 3. Get the quote data to find the customer's email
+    // 5. Get the quote data to find the customer's email
     const quoteDoc = await adminDb.collection('quote_requests').doc(quoteId).get();
     if (!quoteDoc.exists) {
       return NextResponse.json({ error: 'Quote not found' }, { status: 404 });
@@ -110,12 +120,25 @@ export async function POST(req: Request) {
       `
     });
 
-    // 5. Optionally, mark this quote as 'estimated by partnerId' in DB (Not strict requirement now, but good for future logging)
+    // 6. Deduct coins and update partner's estimatedQuotes if not free
+    if (!isFreeToSend) {
+      await adminDb.collection('partners').doc(partnerSnapshot.docs[0].id).update({
+        coins: FieldValue.increment(-estimateCost),
+        estimatedQuotes: FieldValue.arrayUnion(quoteId)
+      });
+    } else if (!isEstimated) {
+      // Just record that they estimated it, without deducting coins (e.g. they unlocked it first)
+      await adminDb.collection('partners').doc(partnerSnapshot.docs[0].id).update({
+        estimatedQuotes: FieldValue.arrayUnion(quoteId)
+      });
+    }
+
+    // 7. Optionally, mark this quote as 'estimated by partnerId' in DB
     await adminDb.collection('quote_requests').doc(quoteId).update({
       estimatesSent: FieldValue.arrayUnion(partnerId)
     }).catch(e => console.error("Error updating estimatesSent:", e));
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, isFreeToSend, coinsDeducted: isFreeToSend ? 0 : estimateCost });
   } catch (error: any) {
     console.error('Error sending estimate:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

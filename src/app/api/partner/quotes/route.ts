@@ -88,7 +88,11 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ 
       quotes, 
-      partner: { coins: partnerData.coins || 0, unlockedQuotes },
+      partner: { 
+        coins: partnerData.coins || 0, 
+        unlockedQuotes,
+        estimatedQuotes: partnerData.estimatedQuotes || []
+      },
       settings 
     });
   } catch (error: any) {

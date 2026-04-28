@@ -82,6 +82,15 @@ export default function PartnerDashboard() {
         alert('성공적으로 고객에게 견적서를 발송했습니다!');
         setEstimateModalOpen(false);
         setEstimateForm({ price: '', message: '' });
+        
+        // Update local state
+        setPartnerData((prev: any) => ({
+          ...prev,
+          coins: (prev.coins || 0) - (data.coinsDeducted || 0),
+          estimatedQuotes: prev.estimatedQuotes?.includes(targetQuote.id) 
+            ? prev.estimatedQuotes 
+            : [...(prev.estimatedQuotes || []), targetQuote.id]
+        }));
       } else {
         alert(data.error || '발송에 실패했습니다.');
       }
@@ -372,6 +381,7 @@ export default function PartnerDashboard() {
                 </tr>
               ) : quotes.map(q => {
                 const isUnlocked = partnerData?.unlockedQuotes?.includes(q.id);
+                const isEstimated = partnerData?.estimatedQuotes?.includes(q.id);
                 return (
                 <tr key={q.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                   <td data-label="접수 일시" style={{ padding: '16px', color: '#0f172a', fontSize: '14px' }}>{new Date(q.createdAt).toLocaleDateString()}</td>
@@ -387,16 +397,24 @@ export default function PartnerDashboard() {
                           onClick={() => { setTargetQuote(q); setEstimateModalOpen(true); }}
                           style={{ marginTop: '4px', background: '#f97316', border: 'none', color: 'white', padding: '6px 10px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold' }}
                         >
-                          ✉️ 견적/제안서 발송
+                          ✉️ 견적/제안서 추가 발송 (무료)
                         </button>
                       )}
                       {!isUnlocked && !q.isExpired && (
-                        <button 
-                          onClick={() => handleUnlockQuote(q.id)}
-                          style={{ marginTop: '4px', background: '#3b82f6', border: 'none', color: 'white', padding: '6px 10px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold' }}
-                        >
-                          🔓 {settings?.unlockCost || 1000} 코인으로 열람하기
-                        </button>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
+                          <button 
+                            onClick={() => { setTargetQuote(q); setEstimateModalOpen(true); }}
+                            style={{ background: isEstimated ? '#f97316' : '#64748b', border: 'none', color: 'white', padding: '6px 10px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', width: '100%', textAlign: 'left' }}
+                          >
+                            ✉️ {isEstimated ? '견적서 재발송 (무료)' : `${settings?.estimateCost || 5000} 코인으로 이메일 발송`}
+                          </button>
+                          <button 
+                            onClick={() => handleUnlockQuote(q.id)}
+                            style={{ background: '#3b82f6', border: 'none', color: 'white', padding: '6px 10px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', width: '100%', textAlign: 'left' }}
+                          >
+                            🔓 {settings?.unlockCost || 20000} 코인으로 상세 정보 열람
+                          </button>
+                        </div>
                       )}
                       {q.isExpired && (
                         <div style={{ marginTop: '4px', display: 'inline-block', padding: '6px 10px', background: '#e2e8f0', color: '#475569', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold' }}>
@@ -584,6 +602,11 @@ export default function PartnerDashboard() {
             </p>
             
             <form onSubmit={handleSendEstimate}>
+              {(!partnerData?.unlockedQuotes?.includes(targetQuote.id) && !partnerData?.estimatedQuotes?.includes(targetQuote.id)) && (
+                <div style={{ padding: '12px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', color: '#b45309' }}>
+                  ⚠️ 발송 시 <strong>{settings?.estimateCost || 5000} 코인</strong>이 차감됩니다. 발송하시겠습니까?
+                </div>
+              )}
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#334155', marginBottom: '8px' }}>예상 견적 금액 (원) <span style={{color: '#ef4444'}}>*</span></label>
                 <input 
