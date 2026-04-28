@@ -425,15 +425,15 @@ export default function PartnerDashboard() {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
                           <button 
                             onClick={() => { setTargetQuote(q); setEstimateModalOpen(true); }}
-                            style={{ background: isEstimated ? '#f97316' : '#64748b', border: 'none', color: 'white', padding: '6px 10px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', width: '100%', textAlign: 'left' }}
+                            style={{ background: isEstimated ? '#f97316' : '#f8fafc', border: isEstimated ? 'none' : '1px solid #cbd5e1', color: isEstimated ? 'white' : '#334155', padding: '8px 10px', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', fontWeight: 'bold', width: '100%', textAlign: 'left', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
                           >
-                            ✉️ {isEstimated ? '견적서 재발송 (무료)' : `${settings?.estimateCost || 5000} 코인으로 이메일 발송`}
+                            ✉️ {isEstimated ? '견적서 재발송 (무료)' : '견적서 발송하기'}
                           </button>
                           <button 
                             onClick={() => handleUnlockQuote(q.id)}
-                            style={{ background: '#3b82f6', border: 'none', color: 'white', padding: '6px 10px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', width: '100%', textAlign: 'left' }}
+                            style={{ background: '#3b82f6', border: 'none', color: 'white', padding: '8px 10px', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', fontWeight: 'bold', width: '100%', textAlign: 'left', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
                           >
-                            🔓 {settings?.unlockCost || 20000} 코인으로 상세 정보 열람
+                            🔓 연락처 및 상세 도면 보기
                           </button>
                         </div>
                       )}
@@ -624,8 +624,12 @@ export default function PartnerDashboard() {
             
             <form onSubmit={handleSendEstimate}>
               {(!partnerData?.unlockedQuotes?.includes(targetQuote.id) && !partnerData?.estimatedQuotes?.includes(targetQuote.id)) && (
-                <div style={{ padding: '12px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', color: '#b45309' }}>
-                  ⚠️ 발송 시 <strong>{settings?.estimateCost || 5000} 코인</strong>이 차감됩니다. 발송하시겠습니까?
+                <div style={{ padding: '16px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', marginBottom: '20px', fontSize: '14px', color: '#b45309', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                  <span style={{ fontSize: '18px' }}>💡</span>
+                  <div>
+                    이 견적서를 발송하시면 <strong>{settings?.estimateCost || 5000} 코인</strong>이 차감됩니다.<br/>
+                    <span style={{ fontSize: '12px', color: '#92400e', marginTop: '4px', display: 'block' }}>작성하신 내용은 고객의 이메일로 즉시 자동 전송됩니다.</span>
+                  </div>
                 </div>
               )}
               <div style={{ marginBottom: '16px' }}>
