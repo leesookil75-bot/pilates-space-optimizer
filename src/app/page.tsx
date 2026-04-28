@@ -52,6 +52,7 @@ export default function Home() {
   const [quoteForm, setQuoteForm] = useState({
     name: '',
     phone: '',
+    email: '',
     region: '',
     expectedDate: '미정'
   });
@@ -92,6 +93,7 @@ export default function Home() {
       setQuoteForm(prev => ({
         ...prev,
         name: prev.name || session.user?.name || '',
+        email: prev.email || session.user?.email || '',
         // NextAuth Kakao provider doesn't give phone by default without specific scope/business app,
         // but we will autofill what we can.
       }));
@@ -234,7 +236,7 @@ export default function Home() {
       if (res.ok) {
         alert('성공적으로 견적 요청이 접수되었습니다!\n원장님이 그리신 도면을 바탕으로 제휴 인테리어 및 기구 업체가 최적의 견적서를 곧 발송해 드립니다.');
         setShowQuoteModal(false);
-        setQuoteForm({ name: '', phone: '', region: '', expectedDate: '미정' });
+        setQuoteForm({ name: '', phone: '', email: '', region: '', expectedDate: '미정' });
       } else {
         alert('견적 요청 중 오류가 발생했습니다. 다시 시도해 주세요.');
       }
@@ -794,6 +796,20 @@ export default function Home() {
                 <p style={{fontSize: '11px', color: '#3b82f6', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px'}}>
                   💡 추후 이 단계는 '카카오 간편 1초 로그인'으로 자동화됩니다.
                 </p>
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '12px', color: '#4b5563', marginBottom: '4px', fontWeight: 600 }}>
+                  이메일 주소 <span style={{color: '#ef4444'}}>*</span>
+                </label>
+                <input 
+                  type="email" 
+                  required
+                  value={quoteForm.email} 
+                  onChange={e => setQuoteForm({...quoteForm, email: e.target.value})} 
+                  placeholder="example@gmail.com (견적서 수신용)"
+                  style={{ width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }} 
+                />
               </div>
 
               <div style={{ marginBottom: '16px' }}>

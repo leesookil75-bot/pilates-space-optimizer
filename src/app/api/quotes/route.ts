@@ -15,6 +15,7 @@ export async function POST(req: Request) {
       phone,
       region,
       expectedDate,
+      email,
       rooms,
       equipments,
     } = body;
@@ -30,6 +31,7 @@ export async function POST(req: Request) {
       expectedDate,
       rooms: rooms || [],
       equipments: equipments || [],
+      customerEmail: email || null,
       userEmail: session?.user?.email || null,
       userName: session?.user?.name || null,
       status: '신규 접수',

@@ -25,6 +25,12 @@ export default function PartnerDashboard() {
   // Floor plan viewer state
   const [viewingQuote, setViewingQuote] = useState<any | null>(null);
 
+  // Send Estimate state
+  const [estimateModalOpen, setEstimateModalOpen] = useState(false);
+  const [targetQuote, setTargetQuote] = useState<any | null>(null);
+  const [estimateForm, setEstimateForm] = useState({ price: '', message: '' });
+  const [sendingEstimate, setSendingEstimate] = useState(false);
+
   const handleChargeRequest = async () => {
     if (!depositorName.trim()) {
       alert('입금자명을 입력해 주세요.');
@@ -50,6 +56,39 @@ export default function PartnerDashboard() {
       alert('서버 통신 오류');
     } finally {
       setRequestingCharge(false);
+    }
+  };
+
+  const handleSendEstimate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!targetQuote || !estimateForm.price) return;
+    
+    setSendingEstimate(true);
+    try {
+      const res = await fetch('/api/partner/send-estimate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          partnerId,
+          password,
+          quoteId: targetQuote.id,
+          estimatePrice: estimateForm.price,
+          message: estimateForm.message
+        })
+      });
+      
+      const data = await res.json();
+      if (res.ok) {
+        alert('성공적으로 고객에게 견적서를 발송했습니다!');
+        setEstimateModalOpen(false);
+        setEstimateForm({ price: '', message: '' });
+      } else {
+        alert(data.error || '발송에 실패했습니다.');
+      }
+    } catch (err) {
+      alert('서버 통신 오류가 발생했습니다.');
+    } finally {
+      setSendingEstimate(false);
     }
   };
 
@@ -343,6 +382,14 @@ export default function PartnerDashboard() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
                       <span style={{ fontSize: '13px', color: '#0f172a', fontWeight: isUnlocked ? 'bold' : 'normal' }}>{q.name}</span>
                       <span style={{ fontSize: '13px', color: '#0f172a', fontWeight: isUnlocked ? 'bold' : 'normal' }}>{q.phone}</span>
+                      {isUnlocked && !q.isExpired && (
+                        <button 
+                          onClick={() => { setTargetQuote(q); setEstimateModalOpen(true); }}
+                          style={{ marginTop: '4px', background: '#f97316', border: 'none', color: 'white', padding: '6px 10px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold' }}
+                        >
+                          ✉️ 견적/제안서 발송
+                        </button>
+                      )}
                       {!isUnlocked && !q.isExpired && (
                         <button 
                           onClick={() => handleUnlockQuote(q.id)}
@@ -521,6 +568,61 @@ export default function PartnerDashboard() {
             >
               닫기
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Send Estimate Modal */}
+      {estimateModalOpen && targetQuote && (
+        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div className="modal-content" style={{ background: 'white', padding: '24px', borderRadius: '12px', width: '100%', maxWidth: '400px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
+            <h2 style={{ margin: '0 0 16px 0', fontSize: '1.25rem', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              ✉️ {targetQuote.name}님께 견적서 발송
+            </h2>
+            <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '24px', lineHeight: '1.5' }}>
+              입력하신 견적 내용이 <strong>고객의 이메일로 즉시 자동 발송</strong>됩니다. 발송 후에는 고객이 직접 원장님께 연락을 드릴 것입니다.
+            </p>
+            
+            <form onSubmit={handleSendEstimate}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#334155', marginBottom: '8px' }}>예상 견적 금액 (원) <span style={{color: '#ef4444'}}>*</span></label>
+                <input 
+                  type="number" 
+                  value={estimateForm.price}
+                  onChange={e => setEstimateForm({...estimateForm, price: e.target.value})}
+                  required
+                  placeholder="예: 25000000"
+                  style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '14px', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#334155', marginBottom: '8px' }}>제안 메시지 및 어필 내용 <span style={{color: '#94a3b8', fontWeight: 'normal'}}>(선택)</span></label>
+                <textarea 
+                  value={estimateForm.message}
+                  onChange={e => setEstimateForm({...estimateForm, message: e.target.value})}
+                  placeholder="예: 원장님, 저희 업체는 기구 전문이라서 도면 구성을 최적화해 드릴 수 있습니다. 언제든 편하게 전화주세요!"
+                  style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '14px', minHeight: '100px', boxSizing: 'border-box', resize: 'vertical' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button 
+                  type="button" 
+                  onClick={() => setEstimateModalOpen(false)}
+                  style={{ flex: 1, padding: '12px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}
+                >
+                  취소
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={sendingEstimate}
+                  style={{ flex: 2, padding: '12px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}
+                >
+                  {sendingEstimate ? '발송 중...' : '견적서 메일 전송하기'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
