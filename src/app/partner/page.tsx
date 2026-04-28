@@ -388,16 +388,19 @@ export default function PartnerDashboard() {
                   <td data-label="진행 상태" style={{ padding: '16px' }}>
                     {getStatusBadge(q.status)}
                     {(() => {
-                      // Calculate total unique competitors who engaged
+                      // Calculate total unique competitors who engaged (excluding current partner)
                       const estimators = q.estimatesSent || [];
                       const unlockers = q.unlockedBy || [];
                       const uniqueCompetitors = new Set([...estimators, ...unlockers]);
+                      if (partnerId) {
+                        uniqueCompetitors.delete(partnerId);
+                      }
                       const count = uniqueCompetitors.size;
                       
                       if (count > 0 && !q.isExpired) {
                         return (
                           <div style={{ marginTop: '8px', display: 'inline-block', padding: '4px 8px', background: '#fee2e2', color: '#dc2626', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', border: '1px solid #fca5a5' }}>
-                            🔥 {count}개 업체 참여 중
+                            🔥 타 업체 {count}곳 참여 중
                           </div>
                         );
                       }
