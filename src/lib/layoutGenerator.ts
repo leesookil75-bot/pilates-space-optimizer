@@ -7,7 +7,8 @@ export interface AILayoutParams {
   groupCount: number;
   groupRooms: {
     reformer: boolean;
-    chairBarrel: boolean;
+    chair: boolean;
+    barrel: boolean;
   };
   privateRoomsCount: number;
   auxiliary: {
@@ -94,22 +95,27 @@ export function generateAILayout(params: AILayoutParams): { rooms: RoomData[], e
     return true;
   };
 
+  const CLR = 40; // Total clearance added to width/height (20px each side)
+
   // 2. Generate Reformer Room
   if (params.groupRooms.reformer && params.groupCount > 0) {
     const cols = 2;
     const rows = Math.ceil(params.groupCount / cols);
-    const refW = EQUIPMENT_DIMS.Reformer.width; // 120
-    const refH = EQUIPMENT_DIMS.Reformer.height; // 35
+    const eqW = EQUIPMENT_DIMS.Reformer.width; // 120
+    const eqH = EQUIPMENT_DIMS.Reformer.height; // 35
     
-    const w = cols * (refW + 60) + 40; // width of room
-    const h = rows * (refH + 80) + 40; // height of room
+    const cellW = eqW + CLR;
+    const cellH = eqH + CLR;
+
+    const w = cols * cellW;
+    const h = rows * cellH;
 
     const fits = placeBlock(`${params.groupCount}:1 리포머룸`, w, h, '#ec4899', (rx, ry) => {
       let count = 0;
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
           if (count >= params.groupCount) break;
-          equipments.push(createEq('Reformer', rx + 50 + c * (refW + 60), ry + 50 + r * (refH + 80), 0));
+          equipments.push(createEq('Reformer', rx + cellW / 2 + c * cellW, ry + cellH / 2 + r * cellH, 0));
           count++;
         }
       }
@@ -117,40 +123,73 @@ export function generateAILayout(params: AILayoutParams): { rooms: RoomData[], e
     if (!fits) return { rooms, equipments, error: '면적이 부족하여 리포머룸을 배치할 수 없습니다.' };
   }
 
-  // 3. Generate Chair/Barrel Room
-  if (params.groupRooms.chairBarrel && params.groupCount > 0) {
-    // Chairs on left, Barrels on right
-    const itemH = 60; // vertical spacing
-    const rows = params.groupCount;
+  // 3. Generate Chair Room
+  if (params.groupRooms.chair && params.groupCount > 0) {
+    const cols = 2;
+    const rows = Math.ceil(params.groupCount / cols);
+    const eqW = EQUIPMENT_DIMS.Chair.width; // 40
+    const eqH = EQUIPMENT_DIMS.Chair.height; // 30
     
-    const w = 40 + 50 + 100; // chair + barrel + center
-    const h = rows * itemH + 40;
+    const cellW = eqW + CLR;
+    const cellH = eqH + CLR;
 
-    const fits = placeBlock(`${params.groupCount}:1 체어바렐룸`, w, h, '#8b5cf6', (rx, ry) => {
+    const w = cols * cellW;
+    const h = rows * cellH;
+
+    const fits = placeBlock(`${params.groupCount}:1 체어룸`, w, h, '#8b5cf6', (rx, ry) => {
+      let count = 0;
       for (let r = 0; r < rows; r++) {
-        // Chair facing right
-        equipments.push(createEq('Chair', rx + 30, ry + 30 + r * itemH, 0));
-        // Barrel facing left
-        equipments.push(createEq('Barrel', rx + w - 50, ry + 30 + r * itemH, 180));
+        for (let c = 0; c < cols; c++) {
+          if (count >= params.groupCount) break;
+          // All chairs facing up (rotation 0) or left/right depending on preference. Let's just use 0.
+          equipments.push(createEq('Chair', rx + cellW / 2 + c * cellW, ry + cellH / 2 + r * cellH, 0));
+          count++;
+        }
       }
     });
-    if (!fits) return { rooms, equipments, error: '면적이 부족하여 체어/바렐룸을 배치할 수 없습니다.' };
+    if (!fits) return { rooms, equipments, error: '면적이 부족하여 체어룸을 배치할 수 없습니다.' };
   }
 
-  // 4. Generate Private Rooms
+  // 4. Generate Barrel Room
+  if (params.groupRooms.barrel && params.groupCount > 0) {
+    const cols = 2;
+    const rows = Math.ceil(params.groupCount / cols);
+    const eqW = EQUIPMENT_DIMS.Barrel.width; // 50
+    const eqH = EQUIPMENT_DIMS.Barrel.height; // 30
+    
+    const cellW = eqW + CLR;
+    const cellH = eqH + CLR;
+
+    const w = cols * cellW;
+    const h = rows * cellH;
+
+    const fits = placeBlock(`${params.groupCount}:1 바렐룸`, w, h, '#3b82f6', (rx, ry) => {
+      let count = 0;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          if (count >= params.groupCount) break;
+          equipments.push(createEq('Barrel', rx + cellW / 2 + c * cellW, ry + cellH / 2 + r * cellH, 0));
+          count++;
+        }
+      }
+    });
+    if (!fits) return { rooms, equipments, error: '면적이 부족하여 바렐룸을 배치할 수 없습니다.' };
+  }
+
+  // 5. Generate Private Rooms
   for (let i = 0; i < params.privateRoomsCount; i++) {
     const w = 220; // ~4.4m
     const h = 200; // ~4.0m
     const fits = placeBlock(`1:1 개인룸 ${i+1}`, w, h, '#10b981', (rx, ry) => {
-      equipments.push(createEq('Cadillac', rx + 30, ry + 30, 0));
-      equipments.push(createEq('Reformer', rx + 30, ry + 120, 0));
-      equipments.push(createEq('Chair', rx + 160, ry + 30, 0));
-      equipments.push(createEq('Barrel', rx + 160, ry + 100, 0));
+      equipments.push(createEq('Cadillac', rx + 60, ry + 40, 0));
+      equipments.push(createEq('Reformer', rx + 60, ry + 130, 0));
+      equipments.push(createEq('Chair', rx + 160, ry + 40, 0));
+      equipments.push(createEq('Barrel', rx + 160, ry + 110, 0));
     });
     if (!fits) return { rooms, equipments, error: '면적이 부족하여 개인룸을 모두 배치할 수 없습니다.' };
   }
 
-  // 5. Auxiliary Rooms
+  // 6. Auxiliary Rooms
   if (params.auxiliary.consultation) {
     const fits = placeBlock('상담실', 120, 120, '#f59e0b', (rx, ry) => {
       equipments.push(createEq('Custom', rx + 30, ry + 30, 0, '상담테이블', 60, 60));

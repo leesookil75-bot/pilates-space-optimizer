@@ -68,7 +68,7 @@ export default function Home() {
   const [aiParams, setAiParams] = useState({
     pyeong: 30,
     groupCount: 6,
-    groupRooms: { reformer: true, chairBarrel: false },
+    groupRooms: { reformer: true, chair: false, barrel: false },
     privateRoomsCount: 1,
     auxiliary: { reception: true, consultation: true, locker: true, lounge: false }
   });
@@ -805,8 +805,12 @@ export default function Home() {
                   리포머룸
                 </label>
                 <label style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={aiParams.groupRooms.chairBarrel} onChange={e => setAiParams({...aiParams, groupRooms: {...aiParams.groupRooms, chairBarrel: e.target.checked}})} />
-                  체어/바렐룸
+                  <input type="checkbox" checked={aiParams.groupRooms.chair} onChange={e => setAiParams({...aiParams, groupRooms: {...aiParams.groupRooms, chair: e.target.checked}})} />
+                  체어룸
+                </label>
+                <label style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={aiParams.groupRooms.barrel} onChange={e => setAiParams({...aiParams, groupRooms: {...aiParams.groupRooms, barrel: e.target.checked}})} />
+                  바렐룸
                 </label>
               </div>
             </div>
