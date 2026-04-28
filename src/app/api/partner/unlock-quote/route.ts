@@ -49,6 +49,11 @@ export async function POST(req: Request) {
       unlockedQuotes: admin.firestore.FieldValue.arrayUnion(quoteId)
     });
 
+    // 6. Track unlock on quote document for FOMO competition count
+    await adminDb.collection('quote_requests').doc(quoteId).update({
+      unlockedBy: admin.firestore.FieldValue.arrayUnion(partnerId)
+    }).catch(e => console.error("Error updating unlockedBy:", e));
+
     return NextResponse.json({ success: true, remainingCoins: currentCoins - unlockCost });
   } catch (error: any) {
     console.error('Error unlocking quote:', error);

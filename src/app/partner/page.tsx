@@ -385,7 +385,25 @@ export default function PartnerDashboard() {
                 return (
                 <tr key={q.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                   <td data-label="접수 일시" style={{ padding: '16px', color: '#0f172a', fontSize: '14px' }}>{new Date(q.createdAt).toLocaleDateString()}</td>
-                  <td data-label="진행 상태" style={{ padding: '16px' }}>{getStatusBadge(q.status)}</td>
+                  <td data-label="진행 상태" style={{ padding: '16px' }}>
+                    {getStatusBadge(q.status)}
+                    {(() => {
+                      // Calculate total unique competitors who engaged
+                      const estimators = q.estimatesSent || [];
+                      const unlockers = q.unlockedBy || [];
+                      const uniqueCompetitors = new Set([...estimators, ...unlockers]);
+                      const count = uniqueCompetitors.size;
+                      
+                      if (count > 0 && !q.isExpired) {
+                        return (
+                          <div style={{ marginTop: '8px', display: 'inline-block', padding: '4px 8px', background: '#fee2e2', color: '#dc2626', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold', border: '1px solid #fca5a5' }}>
+                            🔥 {count}개 업체 참여 중
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                  </td>
                   <td data-label="오픈 지역" style={{ padding: '16px', color: '#0f172a', fontWeight: 'bold' }}>{q.region}</td>
                   <td data-label="오픈 시기" style={{ padding: '16px', color: '#64748b' }}>{q.expectedDate}</td>
                   <td data-label="고객 정보" style={{ padding: '16px' }}>
