@@ -17,6 +17,12 @@ export default function AdminDashboard() {
   // Floor plan viewer state
   const [viewingQuote, setViewingQuote] = useState<any | null>(null);
 
+  // Teaser email modal state
+  const [teaserModalOpen, setTeaserModalOpen] = useState(false);
+  const [selectedQuoteForTeaser, setSelectedQuoteForTeaser] = useState<any | null>(null);
+  const [teaserEmails, setTeaserEmails] = useState('');
+  const [sendingTeaser, setSendingTeaser] = useState(false);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -83,6 +89,51 @@ export default function AdminDashboard() {
       }
     } catch (error) {
       alert('파트너 상태 업데이트 오류');
+    }
+  };
+
+  const handleSendTeaserEmail = async () => {
+    if (!teaserEmails.trim()) {
+      alert('발송할 이메일 주소를 입력해주세요.');
+      return;
+    }
+
+    setSendingTeaser(true);
+    // Parse emails (comma or newline separated)
+    const emailsList = teaserEmails
+      .split(/[\n,]+/)
+      .map(e => e.trim())
+      .filter(e => e && e.includes('@'));
+
+    if (emailsList.length === 0) {
+      alert('유효한 이메일 주소가 없습니다.');
+      setSendingTeaser(false);
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/admin/send-teaser', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          password, 
+          quoteId: selectedQuoteForTeaser.id, 
+          targetEmails: emailsList 
+        })
+      });
+      
+      const data = await res.json();
+      if (res.ok) {
+        alert(`${emailsList.length}건의 영업 이메일 발송이 완료되었습니다!`);
+        setTeaserModalOpen(false);
+        setTeaserEmails('');
+      } else {
+        alert(data.error || '발송 실패');
+      }
+    } catch (error) {
+      alert('서버 통신 오류');
+    } finally {
+      setSendingTeaser(false);
     }
   };
 
@@ -194,7 +245,7 @@ export default function AdminDashboard() {
                 <th style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontSize: '14px' }}>연락처</th>
                 <th style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontSize: '14px' }}>오픈 지역 / 시기</th>
                 <th style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontSize: '14px' }}>필요 기구</th>
-                <th style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontSize: '14px' }}>도면 보기</th>
+                <th style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontSize: '14px' }}>관리 기능</th>
               </tr>
             </thead>
             <tbody>
@@ -243,13 +294,21 @@ export default function AdminDashboard() {
                   <td data-label="필요 기구" style={{ padding: '16px', color: '#111827', fontSize: '13px', maxWidth: '250px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={summarizeEquipments(q.equipments)}>
                     {summarizeEquipments(q.equipments)}
                   </td>
-                  <td data-label="도면 보기" style={{ padding: '16px' }}>
-                    <button 
-                      onClick={() => setViewingQuote(q)}
-                      style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
-                    >
-                      도면 열기
-                    </button>
+                  <td data-label="관리 기능" style={{ padding: '16px' }}>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button 
+                        onClick={() => setViewingQuote(q)}
+                        style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
+                      >
+                        도면
+                      </button>
+                      <button 
+                        onClick={() => { setSelectedQuoteForTeaser(q); setTeaserModalOpen(true); }}
+                        style={{ background: '#ec4899', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
+                      >
+                        📧 영업 발송
+                      </button>
+                    </div>
                   </td>
                 </tr>
               )})}
@@ -343,6 +402,52 @@ export default function AdminDashboard() {
             />
           </div>
         </div>
+        </div>
+      )}
+
+      {/* Teaser Email Modal */}
+      {teaserModalOpen && selectedQuoteForTeaser && (
+        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div style={{ background: 'white', borderRadius: '12px', width: '100%', maxWidth: '500px', padding: '32px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#111827', margin: '0 0 16px 0' }}>영업용 티저 이메일 발송</h2>
+            <p style={{ fontSize: '14px', color: '#4b5563', marginBottom: '24px', lineHeight: 1.5 }}>
+              <strong>{selectedQuoteForTeaser.region}</strong> 오더의 일부 정보를 미끼로 활용하여,<br/>
+              아직 가입하지 않은 잠재 제휴사들의 가입을 유도합니다.<br/>
+              (고객 연락처와 상세 도면은 이메일에 포함되지 않습니다.)
+            </p>
+
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: 'bold', color: '#374151', marginBottom: '8px' }}>
+                수신 대상 이메일 주소
+              </label>
+              <textarea 
+                value={teaserEmails}
+                onChange={(e) => setTeaserEmails(e.target.value)}
+                placeholder="발송할 이메일 주소를 콤마(,) 또는 줄바꿈으로 구분하여 여러 개 입력하세요."
+                style={{ width: '100%', height: '150px', padding: '12px', borderRadius: '8px', border: '1px solid #d1d5db', fontSize: '14px', resize: 'vertical', boxSizing: 'border-box' }}
+              />
+              <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '8px' }}>
+                * 숨은참조(BCC)로 한 번에 발송되므로 수신자들은 서로의 주소를 볼 수 없습니다.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button 
+                onClick={() => setTeaserModalOpen(false)}
+                disabled={sendingTeaser}
+                style={{ flex: 1, padding: '12px', background: 'white', border: '1px solid #d1d5db', borderRadius: '8px', color: '#374151', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                취소
+              </button>
+              <button 
+                onClick={handleSendTeaserEmail}
+                disabled={sendingTeaser}
+                style={{ flex: 2, padding: '12px', background: '#ec4899', border: 'none', borderRadius: '8px', color: 'white', fontWeight: 'bold', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center' }}
+              >
+                {sendingTeaser ? '발송 중...' : '🚀 이메일 일괄 발송하기'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
