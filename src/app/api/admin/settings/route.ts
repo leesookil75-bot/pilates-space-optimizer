@@ -14,7 +14,8 @@ export async function GET() {
         bankAccount: '1002352696292',
         bankOwner: '이수길',
         unlockCost: 1000,
-        adminEmail: process.env.EMAIL_USER || 'admin@example.com'
+        adminEmail: process.env.EMAIL_USER || 'admin@example.com',
+        expireDays: 30
       });
     }
 

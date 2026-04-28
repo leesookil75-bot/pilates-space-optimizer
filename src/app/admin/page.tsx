@@ -333,12 +333,22 @@ export default function AdminDashboard() {
                     style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #d1d5db' }}
                   />
                 </div>
-                <div style={{ marginBottom: '32px' }}>
+                <div style={{ marginBottom: '20px' }}>
                   <label style={{ display: 'block', fontSize: '14px', fontWeight: 'bold', color: '#374151', marginBottom: '8px' }}>알림 수신 이메일 주소 (입점/충전 알림용)</label>
                   <input 
                     type="email" 
                     value={settings.adminEmail || ''}
                     onChange={e => setSettings({...settings, adminEmail: e.target.value})}
+                    style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #d1d5db' }}
+                  />
+                </div>
+                <div style={{ marginBottom: '32px' }}>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: 'bold', color: '#374151', marginBottom: '8px' }}>오더 자동 만료 기간 (일 단위, 기본: 30)</label>
+                  <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 8px 0' }}>설정된 기간이 지나거나, 상태가 '계약 완료' 등으로 변경되면 개인정보가 블라인드 처리됩니다.</p>
+                  <input 
+                    type="number" 
+                    value={settings.expireDays || 30}
+                    onChange={e => setSettings({...settings, expireDays: parseInt(e.target.value) || 0})}
                     style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #d1d5db' }}
                   />
                 </div>

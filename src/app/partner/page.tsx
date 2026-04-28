@@ -343,7 +343,7 @@ export default function PartnerDashboard() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
                       <span style={{ fontSize: '13px', color: '#0f172a', fontWeight: isUnlocked ? 'bold' : 'normal' }}>{q.name}</span>
                       <span style={{ fontSize: '13px', color: '#0f172a', fontWeight: isUnlocked ? 'bold' : 'normal' }}>{q.phone}</span>
-                      {!isUnlocked && (
+                      {!isUnlocked && !q.isExpired && (
                         <button 
                           onClick={() => handleUnlockQuote(q.id)}
                           style={{ marginTop: '4px', background: '#3b82f6', border: 'none', color: 'white', padding: '6px 10px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold' }}
@@ -351,13 +351,20 @@ export default function PartnerDashboard() {
                           🔓 {settings?.unlockCost || 1000} 코인으로 열람하기
                         </button>
                       )}
+                      {q.isExpired && (
+                        <div style={{ marginTop: '4px', display: 'inline-block', padding: '6px 10px', background: '#e2e8f0', color: '#475569', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold' }}>
+                          🔒 기간 만료 (열람 불가)
+                        </div>
+                      )}
                     </div>
                   </td>
                   <td data-label="필요 기구" style={{ padding: '16px', color: '#0f172a', fontSize: '13px', maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={summarizeEquipments(q.equipments)}>
                     {summarizeEquipments(q.equipments)}
                   </td>
                   <td data-label="도면 보기" style={{ padding: '16px' }}>
-                    {isUnlocked ? (
+                    {q.isExpired ? (
+                      <span style={{ fontSize: '13px', color: '#94a3b8' }}>🔒 열람 만료됨</span>
+                    ) : isUnlocked ? (
                       <button 
                         onClick={() => setViewingQuote(q)}
                         style={{ background: '#10b981', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}

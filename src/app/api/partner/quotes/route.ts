@@ -37,20 +37,53 @@ export async function POST(req: Request) {
     // Mask contact information if not unlocked
     const unlockedQuotes = partnerData.unlockedQuotes || [];
 
+    // Map to client-friendly format
     const quotes = snapshot.docs.map(doc => {
       const data = doc.data();
-      const isUnlocked = unlockedQuotes.includes(doc.id);
+      const isPurchased = unlockedQuotes.includes(doc.id);
+      
+      // Determine if the quote is expired
+      const expireDays = settings?.expireDays || 30;
+      const createdAt = data.createdAt ? new Date(data.createdAt).getTime() : Date.now();
+      const daysSinceCreation = (Date.now() - createdAt) / (1000 * 60 * 60 * 24);
+      
+      const isExpiredByTime = daysSinceCreation > expireDays;
+      const isExpiredByStatus = ['계약 완료', '보류/취소', '기간 만료'].includes(data.status);
+      const isExpired = isExpiredByTime || isExpiredByStatus;
 
-      if (isUnlocked) {
-        return { id: doc.id, ...data }; // Return full data if unlocked
-      } else {
+      // If expired, completely mask sensitive data regardless of purchase status
+      if (isExpired) {
         return {
           id: doc.id,
           ...data,
-          name: data.name ? data.name[0] + '*'.repeat(data.name.length - 1) : '***',
-          phone: data.phone ? data.phone.substring(0, 4) + '****-****' : '010-****-****',
+          name: data.name ? `${data.name[0]}**` : '익명',
+          phone: '010-****-****',
+          floorPlanUrl: null, // Hide floor plan
+          isPurchased: false, // Cannot be purchased or viewed anymore
+          isExpired: true
         };
       }
+
+      // If not purchased and not expired, mask the data
+      if (!isPurchased) {
+        return {
+          id: doc.id,
+          ...data,
+          name: data.name ? `${data.name[0]}**` : '익명',
+          phone: data.phone ? data.phone.substring(0, 4) + '****-****' : '010-****-****',
+          floorPlanUrl: null, // Hide floor plan for non-purchased
+          isPurchased: false,
+          isExpired: false
+        };
+      }
+
+      // If purchased and not expired, return full data
+      return {
+        id: doc.id,
+        ...data,
+        isPurchased: true,
+        isExpired: false
+      };
     });
 
     return NextResponse.json({ 
