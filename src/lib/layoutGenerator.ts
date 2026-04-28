@@ -45,186 +45,208 @@ const createEq = (type: EquipmentType, x: number, y: number, rotation: number, c
   isLocked: false
 });
 
+interface Block {
+  name: string;
+  w: number;
+  h: number;
+  color: string;
+  itemsFn: (rx: number, ry: number) => void;
+}
+
 export function generateAILayout(params: AILayoutParams): { rooms: RoomData[], equipments: EquipmentData[], error?: string } {
   const rooms: RoomData[] = [];
   const equipments: EquipmentData[] = [];
+  const blocks: Block[] = [];
   
-  // 1. Calculate Total Outer Area
-  // 1 pyeong = ~3.3057 sqm. 1m = 50px.
-  const totalSqm = params.pyeong * 3.3057;
-  // Assume a 4:3 aspect ratio for the main floor
-  const heightM = Math.sqrt(totalSqm / (4/3));
-  const widthM = heightM * (4/3);
-  
-  const outerWidthPx = Math.round(widthM * 50);
-  const outerHeightPx = Math.round(heightM * 50);
-  
-  const startX = 100;
-  const startY = 100;
-  
-  // Outer wall
-  rooms.push(createRoom('전체 외벽', 'outer', startX, startY, outerWidthPx, outerHeightPx, '#3b82f6'));
-
-  let requiredAreaPx = 0;
-  
-  // Packing logic: We will place rooms sequentially from top-left, wrapping to next row if needed.
-  let currentX = startX; // Start exactly at the outer wall border
-  let currentY = startY;
-  let rowMaxHeight = 0;
-
-  const placeBlock = (name: string, w: number, h: number, color: string, itemsFn: (rx: number, ry: number) => void) => {
-    // Check if it fits in current row
-    if (currentX + w > startX + outerWidthPx) {
-      // Move to next row tightly
-      currentX = startX;
-      currentY += rowMaxHeight;
-      rowMaxHeight = 0;
-    }
-    
-    // Check if it fits vertically
-    if (currentY + h > startY + outerHeightPx) {
-      return false; // Does not fit!
-    }
-
-    rooms.push(createRoom(name, 'inner', currentX, currentY, w, h, color));
-    itemsFn(currentX, currentY);
-
-    currentX += w; // Advance X tightly with 0 gap
-    if (h > rowMaxHeight) rowMaxHeight = h;
-    requiredAreaPx += (w * h);
-    return true;
-  };
-
   const CLR = 40; // Total clearance added to width/height (20px each side)
 
-  // 2. Generate Reformer Room
+  // 1. Gather all required rooms (Blocks)
   if (params.groupRooms.reformer && params.groupCount > 0) {
     const cols = 2;
     const rows = Math.ceil(params.groupCount / cols);
-    const eqW = EQUIPMENT_DIMS.Reformer.width; // 120
-    const eqH = EQUIPMENT_DIMS.Reformer.height; // 35
-    
+    const eqW = EQUIPMENT_DIMS.Reformer.width; 
+    const eqH = EQUIPMENT_DIMS.Reformer.height; 
     const cellW = eqW + CLR;
     const cellH = eqH + CLR;
-
-    const w = cols * cellW;
-    const h = rows * cellH;
-
-    const fits = placeBlock(`${params.groupCount}:1 리포머룸`, w, h, '#ec4899', (rx, ry) => {
-      let count = 0;
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-          if (count >= params.groupCount) break;
-          equipments.push(createEq('Reformer', rx + cellW / 2 + c * cellW, ry + cellH / 2 + r * cellH, 0));
-          count++;
+    blocks.push({
+      name: `${params.groupCount}:1 리포머룸`, w: cols * cellW, h: rows * cellH, color: '#ec4899',
+      itemsFn: (rx, ry) => {
+        let count = 0;
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            if (count >= params.groupCount) break;
+            equipments.push(createEq('Reformer', rx + cellW / 2 + c * cellW, ry + cellH / 2 + r * cellH, 0));
+            count++;
+          }
         }
       }
     });
-    if (!fits) return { rooms, equipments, error: '면적이 부족하여 리포머룸을 배치할 수 없습니다.' };
   }
 
-  // 3. Generate Chair Room
   if (params.groupRooms.chair && params.groupCount > 0) {
     const cols = 2;
     const rows = Math.ceil(params.groupCount / cols);
-    const eqW = EQUIPMENT_DIMS.Chair.width; // 40
-    const eqH = EQUIPMENT_DIMS.Chair.height; // 30
-    
+    const eqW = EQUIPMENT_DIMS.Chair.width; 
+    const eqH = EQUIPMENT_DIMS.Chair.height; 
     const cellW = eqW + CLR;
     const cellH = eqH + CLR;
-
-    const w = cols * cellW;
-    const h = rows * cellH;
-
-    const fits = placeBlock(`${params.groupCount}:1 체어룸`, w, h, '#8b5cf6', (rx, ry) => {
-      let count = 0;
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-          if (count >= params.groupCount) break;
-          // All chairs facing up (rotation 0) or left/right depending on preference. Let's just use 0.
-          equipments.push(createEq('Chair', rx + cellW / 2 + c * cellW, ry + cellH / 2 + r * cellH, 0));
-          count++;
+    blocks.push({
+      name: `${params.groupCount}:1 체어룸`, w: cols * cellW, h: rows * cellH, color: '#8b5cf6',
+      itemsFn: (rx, ry) => {
+        let count = 0;
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            if (count >= params.groupCount) break;
+            equipments.push(createEq('Chair', rx + cellW / 2 + c * cellW, ry + cellH / 2 + r * cellH, 0));
+            count++;
+          }
         }
       }
     });
-    if (!fits) return { rooms, equipments, error: '면적이 부족하여 체어룸을 배치할 수 없습니다.' };
   }
 
-  // 4. Generate Barrel Room
   if (params.groupRooms.barrel && params.groupCount > 0) {
     const cols = 2;
     const rows = Math.ceil(params.groupCount / cols);
-    const eqW = EQUIPMENT_DIMS.Barrel.width; // 50
-    const eqH = EQUIPMENT_DIMS.Barrel.height; // 30
-    
+    const eqW = EQUIPMENT_DIMS.Barrel.width; 
+    const eqH = EQUIPMENT_DIMS.Barrel.height; 
     const cellW = eqW + CLR;
     const cellH = eqH + CLR;
-
-    const w = cols * cellW;
-    const h = rows * cellH;
-
-    const fits = placeBlock(`${params.groupCount}:1 바렐룸`, w, h, '#3b82f6', (rx, ry) => {
-      let count = 0;
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-          if (count >= params.groupCount) break;
-          equipments.push(createEq('Barrel', rx + cellW / 2 + c * cellW, ry + cellH / 2 + r * cellH, 0));
-          count++;
+    blocks.push({
+      name: `${params.groupCount}:1 바렐룸`, w: cols * cellW, h: rows * cellH, color: '#3b82f6',
+      itemsFn: (rx, ry) => {
+        let count = 0;
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            if (count >= params.groupCount) break;
+            equipments.push(createEq('Barrel', rx + cellW / 2 + c * cellW, ry + cellH / 2 + r * cellH, 0));
+            count++;
+          }
         }
       }
     });
-    if (!fits) return { rooms, equipments, error: '면적이 부족하여 바렐룸을 배치할 수 없습니다.' };
   }
 
-  // 5. Generate Private Rooms
   for (let i = 0; i < params.privateRoomsCount; i++) {
-    const w = 220; // ~4.4m
-    const h = 200; // ~4.0m
-    const fits = placeBlock(`1:1 개인룸 ${i+1}`, w, h, '#10b981', (rx, ry) => {
-      equipments.push(createEq('Cadillac', rx + 60, ry + 40, 0));
-      equipments.push(createEq('Reformer', rx + 60, ry + 130, 0));
-      equipments.push(createEq('Chair', rx + 160, ry + 40, 0));
-      equipments.push(createEq('Barrel', rx + 160, ry + 110, 0));
+    blocks.push({
+      name: `1:1 개인룸 ${i+1}`, w: 220, h: 200, color: '#10b981',
+      itemsFn: (rx, ry) => {
+        equipments.push(createEq('Cadillac', rx + 60, ry + 40, 0));
+        equipments.push(createEq('Reformer', rx + 60, ry + 130, 0));
+        equipments.push(createEq('Chair', rx + 160, ry + 40, 0));
+        equipments.push(createEq('Barrel', rx + 160, ry + 110, 0));
+      }
     });
-    if (!fits) return { rooms, equipments, error: '면적이 부족하여 개인룸을 모두 배치할 수 없습니다.' };
   }
 
-  // 6. Auxiliary Rooms
   if (params.auxiliary.consultation) {
-    const fits = placeBlock('상담실', 120, 120, '#f59e0b', (rx, ry) => {
-      equipments.push(createEq('Custom', rx + 30, ry + 30, 0, '상담테이블', 60, 60));
+    blocks.push({
+      name: '상담실', w: 120, h: 120, color: '#f59e0b',
+      itemsFn: (rx, ry) => equipments.push(createEq('Custom', rx + 60, ry + 60, 0, '상담테이블', 60, 60))
     });
-    if (!fits) return { rooms, equipments, error: '면적이 부족하여 상담실을 배치할 수 없습니다.' };
   }
 
   if (params.auxiliary.locker) {
-    const fits = placeBlock('탈의실 (남/여)', 150, 180, '#06b6d4', (rx, ry) => {
-      equipments.push(createEq('Custom', rx + 20, ry + 20, 0, '여자 락커', 110, 50));
-      equipments.push(createEq('Custom', rx + 20, ry + 100, 0, '남자 락커', 110, 50));
+    blocks.push({
+      name: '탈의실 (남/여)', w: 150, h: 180, color: '#06b6d4',
+      itemsFn: (rx, ry) => {
+        equipments.push(createEq('Custom', rx + 75, ry + 45, 0, '여자 락커', 110, 50));
+        equipments.push(createEq('Custom', rx + 75, ry + 135, 0, '남자 락커', 110, 50));
+      }
     });
-    if (!fits) return { rooms, equipments, error: '면적이 부족하여 탈의실을 배치할 수 없습니다.' };
   }
 
   if (params.auxiliary.lounge) {
-    const fits = placeBlock('휴게실', 150, 150, '#14b8a6', (rx, ry) => {
-      equipments.push(createEq('Custom', rx + 30, ry + 30, 0, '소파/테이블', 90, 90));
+    blocks.push({
+      name: '휴게실', w: 150, h: 150, color: '#14b8a6',
+      itemsFn: (rx, ry) => equipments.push(createEq('Custom', rx + 75, ry + 75, 0, '소파/테이블', 90, 90))
     });
-    if (!fits) return { rooms, equipments, error: '면적이 부족하여 휴게실을 배치할 수 없습니다.' };
   }
 
+  let receptionBlock: Block | null = null;
   if (params.auxiliary.reception) {
-    // Put reception at some remaining space near the entrance
-    const fits = placeBlock('로비 / 인포데스크', 180, 150, '#64748b', (rx, ry) => {
-      equipments.push(createEq('Custom', rx + 40, ry + 40, 0, '인포데스크', 100, 50));
-    });
-    // If it doesn't fit as a room, just throw the desk somewhere
-    if (!fits) {
-      equipments.push(createEq('Custom', startX + outerWidthPx - 150, startY + outerHeightPx - 100, 0, '인포데스크', 100, 50));
+    receptionBlock = {
+      name: '로비/인포데스크', w: 180, h: 150, color: '#64748b',
+      itemsFn: (rx, ry) => equipments.push(createEq('Custom', rx + 90, ry + 75, 0, '인포데스크', 100, 50))
+    };
+  }
+
+  // 2. Divide blocks into Top Row and Bottom Row for Central Corridor
+  let topWidth = 0;
+  let bottomWidth = 0;
+  const topBlocks: Block[] = [];
+  const bottomBlocks: Block[] = [];
+  
+  // Try to balance the rows. Put reception at the end of bottom row if exists
+  for (const b of blocks) {
+    if (topWidth <= bottomWidth) {
+      topBlocks.push(b);
+      topWidth += b.w;
+    } else {
+      bottomBlocks.push(b);
+      bottomWidth += b.w;
     }
   }
 
-  // Add the main door to the outer wall
-  equipments.push(createEq('Door', startX + outerWidthPx - 60, startY + outerHeightPx - 45, 0));
+  if (receptionBlock) {
+    bottomBlocks.push(receptionBlock);
+    bottomWidth += receptionBlock.w;
+  }
+
+  // 3. Calculate Outer Wall Dimensions
+  const totalPx = (params.pyeong * 3.3057) * 2500;
+  const corridorWidth = 80; // 1.6m wide hallway
+  
+  const minOuterW = Math.max(topWidth, bottomWidth) + 40; // 40px padding for safety
+  const maxTopH = Math.max(...topBlocks.map(b => b.h), 0);
+  const maxBotH = Math.max(...bottomBlocks.map(b => b.h), 0);
+  const minOuterH = maxTopH + maxBotH + corridorWidth;
+
+  if (minOuterW * minOuterH > totalPx) {
+    return { rooms, equipments, error: '선택하신 옵션을 배치하기에 평수가 너무 좁습니다. 기구를 줄이거나 평수를 늘려주세요.' };
+  }
+
+  // Expand outer wall to match requested pyeong proportionally
+  const ratio = minOuterW / minOuterH;
+  const finalOuterH = Math.max(minOuterH, Math.sqrt(totalPx / ratio));
+  const finalOuterW = Math.max(minOuterW, finalOuterH * ratio);
+
+  const startX = 100;
+  const startY = 100;
+  
+  // Create outer wall
+  rooms.push(createRoom('전체 외벽', 'outer', startX, startY, finalOuterW, finalOuterH, '#3b82f6'));
+
+  // Main Entrance Door (right side, bottom corner)
+  equipments.push(createEq('Door', startX + finalOuterW, startY + finalOuterH - 45, -90, undefined, 45, 45));
+
+  // 4. Place Top Row
+  let currentX = startX;
+  for (const b of topBlocks) {
+    const rx = currentX;
+    const ry = startY;
+    rooms.push(createRoom(b.name, 'inner', rx, ry, b.w, b.h, b.color));
+    b.itemsFn(rx, ry);
+    
+    // Add Room Door facing the corridor (Bottom of this room)
+    equipments.push(createEq('Door', rx + b.w / 2, ry + b.h, 0, undefined, 45, 45));
+    
+    currentX += b.w;
+  }
+
+  // 5. Place Bottom Row
+  currentX = startX;
+  for (const b of bottomBlocks) {
+    const rx = currentX;
+    const ry = startY + finalOuterH - b.h;
+    rooms.push(createRoom(b.name, 'inner', rx, ry, b.w, b.h, b.color));
+    b.itemsFn(rx, ry);
+    
+    // Add Room Door facing the corridor (Top of this room)
+    equipments.push(createEq('Door', rx + b.w / 2, ry, 180, undefined, 45, 45));
+    
+    currentX += b.w;
+  }
 
   return { rooms, equipments };
 }
