@@ -202,11 +202,8 @@ export function generateAILayout(params: AILayoutParams): { rooms: RoomData[], e
   const maxBotH = Math.max(...bottomBlocks.map(b => b.h), 0);
   const minOuterH = maxTopH + maxBotH + corridorWidth;
 
-  if (minOuterW * minOuterH > totalPx) {
-    return { rooms, equipments, error: '선택하신 옵션을 배치하기에 평수가 너무 좁습니다. 기구를 줄이거나 평수를 늘려주세요.' };
-  }
-
-  // Expand outer wall to match requested pyeong proportionally
+  // If requested pyeong is too small, we just forcefully expand the outer wall to fit the layout.
+  // Expand outer wall to match requested pyeong proportionally if it's larger
   const ratio = minOuterW / minOuterH;
   const finalOuterH = Math.max(minOuterH, Math.sqrt(totalPx / ratio));
   const finalOuterW = Math.max(minOuterW, finalOuterH * ratio);
@@ -215,7 +212,10 @@ export function generateAILayout(params: AILayoutParams): { rooms: RoomData[], e
   const startY = 100;
   
   // Create outer wall
-  rooms.push(createRoom('전체 외벽', 'outer', startX, startY, finalOuterW, finalOuterH, '#3b82f6'));
+  rooms.push(createRoom('전체 외벽', 'outer', startX, startY, finalOuterW, finalOuterH, '#f8fafc'));
+
+  // Explicitly draw the Corridor as a Room so the user clearly sees it
+  rooms.push(createRoom('메인 복도', 'inner', startX, startY + maxTopH, finalOuterW, finalOuterH - maxTopH - maxBotH, '#e2e8f0'));
 
   // Main Entrance Door (right side, bottom corner)
   equipments.push(createEq('Door', startX + finalOuterW, startY + finalOuterH - 45, -90, undefined, 45, 45));
