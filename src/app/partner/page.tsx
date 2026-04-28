@@ -16,11 +16,41 @@ export default function PartnerDashboard() {
   const [partnerData, setPartnerData] = useState<any>(null);
   const [settings, setSettings] = useState<any>(null);
   const [chargeModalOpen, setChargeModalOpen] = useState(false);
+  const [depositorName, setDepositorName] = useState('');
+  const [requestingCharge, setRequestingCharge] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  
+
   // Floor plan viewer state
   const [viewingQuote, setViewingQuote] = useState<any | null>(null);
+
+  const handleChargeRequest = async () => {
+    if (!depositorName.trim()) {
+      alert('입금자명을 입력해 주세요.');
+      return;
+    }
+    
+    setRequestingCharge(true);
+    try {
+      const res = await fetch('/api/partner/charge-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ partnerId, password, depositorName })
+      });
+      
+      if (res.ok) {
+        alert('관리자에게 입금 확인 요청 알림이 전송되었습니다. 확인 후 곧바로 코인이 충전됩니다.');
+        setDepositorName('');
+        setChargeModalOpen(false);
+      } else {
+        alert('알림 전송에 실패했습니다. 카카오톡으로 문의해 주세요.');
+      }
+    } catch (err) {
+      alert('서버 통신 오류');
+    } finally {
+      setRequestingCharge(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -395,14 +425,34 @@ export default function PartnerDashboard() {
             </div>
 
             <p style={{ fontSize: '13px', color: '#ef4444', textAlign: 'center', marginBottom: '24px', fontWeight: 'bold' }}>
-              * 입금 후 우측 하단의 카카오톡으로 입금자명과 업체를 꼭 남겨주세요!
+              * 카카오톡으로 문의하시거나, 아래에서 입금 확인을 요청해 주세요.
             </p>
+
+            <div style={{ background: '#f1f5f9', padding: '16px', borderRadius: '8px', marginBottom: '24px' }}>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: 'bold', color: '#334155', marginBottom: '8px' }}>입금하신 분의 성함 (입금자명)</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input 
+                  type="text" 
+                  value={depositorName}
+                  onChange={e => setDepositorName(e.target.value)}
+                  placeholder="예: 홍길동"
+                  style={{ flex: 1, padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                />
+                <button 
+                  onClick={handleChargeRequest}
+                  disabled={requestingCharge}
+                  style={{ background: '#ec4899', border: 'none', color: 'white', padding: '0 16px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                >
+                  {requestingCharge ? '전송 중...' : '🚀 확인 요청'}
+                </button>
+              </div>
+            </div>
 
             <button 
               onClick={() => setChargeModalOpen(false)}
               style={{ width: '100%', padding: '14px', background: '#1e293b', border: 'none', borderRadius: '8px', color: 'white', fontWeight: 'bold', cursor: 'pointer', fontSize: '15px' }}
             >
-              확인했습니다 (닫기)
+              닫기
             </button>
           </div>
         </div>

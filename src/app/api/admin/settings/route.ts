@@ -13,7 +13,8 @@ export async function GET() {
         bankName: '우리은행',
         bankAccount: '1002352696292',
         bankOwner: '이수길',
-        unlockCost: 1000
+        unlockCost: 1000,
+        adminEmail: process.env.EMAIL_USER || 'admin@example.com'
       });
     }
 

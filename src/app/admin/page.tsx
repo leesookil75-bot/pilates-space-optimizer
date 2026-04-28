@@ -324,12 +324,21 @@ export default function AdminDashboard() {
                     style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #d1d5db' }}
                   />
                 </div>
-                <div style={{ marginBottom: '32px' }}>
+                <div style={{ marginBottom: '20px' }}>
                   <label style={{ display: 'block', fontSize: '14px', fontWeight: 'bold', color: '#374151', marginBottom: '8px' }}>오더 1건당 열람 차감 코인 (기본: 1000)</label>
                   <input 
                     type="number" 
                     value={settings.unlockCost}
                     onChange={e => setSettings({...settings, unlockCost: parseInt(e.target.value) || 0})}
+                    style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #d1d5db' }}
+                  />
+                </div>
+                <div style={{ marginBottom: '32px' }}>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: 'bold', color: '#374151', marginBottom: '8px' }}>알림 수신 이메일 주소 (입점/충전 알림용)</label>
+                  <input 
+                    type="email" 
+                    value={settings.adminEmail || ''}
+                    onChange={e => setSettings({...settings, adminEmail: e.target.value})}
                     style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #d1d5db' }}
                   />
                 </div>
