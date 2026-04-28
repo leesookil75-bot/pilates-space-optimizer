@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import dynamic from 'next/dynamic';
+import { storage } from '@/lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const EditorCanvas = dynamic(() => import('@/components/Editor/EditorCanvas'), { ssr: false });
 
@@ -29,6 +31,7 @@ export default function PartnerDashboard() {
   const [estimateModalOpen, setEstimateModalOpen] = useState(false);
   const [targetQuote, setTargetQuote] = useState<any | null>(null);
   const [estimateForm, setEstimateForm] = useState({ price: '', message: '' });
+  const [estimateFile, setEstimateFile] = useState<File | null>(null);
   const [sendingEstimate, setSendingEstimate] = useState(false);
 
   const handleChargeRequest = async () => {
@@ -61,10 +64,22 @@ export default function PartnerDashboard() {
 
   const handleSendEstimate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!targetQuote || !estimateForm.price) return;
+    if (!targetQuote || !estimateFile) {
+      alert('견적서 파일을 반드시 첨부해 주세요.');
+      return;
+    }
     
     setSendingEstimate(true);
     try {
+      // 1. Upload file to Firebase Storage
+      const fileExtension = estimateFile.name.split('.').pop();
+      const fileName = `estimates/${targetQuote.id}/${partnerId}_${Date.now()}.${fileExtension}`;
+      const storageRef = ref(storage, fileName);
+      
+      await uploadBytes(storageRef, estimateFile);
+      const fileUrl = await getDownloadURL(storageRef);
+
+      // 2. Send API request with fileUrl
       const res = await fetch('/api/partner/send-estimate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -72,8 +87,9 @@ export default function PartnerDashboard() {
           partnerId,
           password,
           quoteId: targetQuote.id,
-          estimatePrice: estimateForm.price,
-          message: estimateForm.message
+          estimatePrice: estimateForm.price, // Optional now
+          message: estimateForm.message,
+          fileUrl // Passed to backend
         })
       });
       
@@ -82,6 +98,7 @@ export default function PartnerDashboard() {
         alert('성공적으로 고객에게 견적서를 발송했습니다!');
         setEstimateModalOpen(false);
         setEstimateForm({ price: '', message: '' });
+        setEstimateFile(null);
         
         // Update local state
         setPartnerData((prev: any) => ({
@@ -95,7 +112,8 @@ export default function PartnerDashboard() {
         alert(data.error || '발송에 실패했습니다.');
       }
     } catch (err) {
-      alert('서버 통신 오류가 발생했습니다.');
+      console.error(err);
+      alert('서버 통신 오류가 발생했습니다. (파일 용량을 확인해 주세요.)');
     } finally {
       setSendingEstimate(false);
     }
@@ -633,19 +651,40 @@ export default function PartnerDashboard() {
                 </div>
               )}
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#334155', marginBottom: '8px' }}>예상 견적 금액 (원) <span style={{color: '#ef4444'}}>*</span></label>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#334155', marginBottom: '8px' }}>견적서 파일 첨부 (PDF, JPG, PNG) <span style={{color: '#ef4444'}}>*</span></label>
+                <input 
+                  type="file" 
+                  accept=".pdf, .jpg, .jpeg, .png"
+                  onChange={e => {
+                    if (e.target.files && e.target.files.length > 0) {
+                      const file = e.target.files[0];
+                      if (file.size > 5 * 1024 * 1024) {
+                        alert('파일 용량은 5MB를 초과할 수 없습니다.');
+                        e.target.value = '';
+                        return;
+                      }
+                      setEstimateFile(file);
+                    } else {
+                      setEstimateFile(null);
+                    }
+                  }}
+                  style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                />
+                <p style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>최대 5MB. 정식 로고가 포함된 견적서를 권장합니다.</p>
+              </div>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#334155', marginBottom: '8px' }}>대략적인 총 견적 금액 (선택 사항)</label>
                 <input 
                   type="number" 
+                  placeholder="예: 25000000"
                   value={estimateForm.price}
                   onChange={e => setEstimateForm({...estimateForm, price: e.target.value})}
-                  required
-                  placeholder="예: 25000000"
-                  style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '14px', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '14px' }}
                 />
+                <p style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>메일 본문에 총액을 적어주시면 고객이 견적서 파일을 열어볼 확률이 매우 높아집니다.</p>
               </div>
-
               <div style={{ marginBottom: '24px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#334155', marginBottom: '8px' }}>제안 메시지 및 어필 내용 <span style={{color: '#94a3b8', fontWeight: 'normal'}}>(선택)</span></label>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#334155', marginBottom: '8px' }}>어필 메시지 (선택 사항)</label>
                 <textarea 
                   value={estimateForm.message}
                   onChange={e => setEstimateForm({...estimateForm, message: e.target.value})}
@@ -657,15 +696,15 @@ export default function PartnerDashboard() {
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button 
                   type="button" 
-                  onClick={() => setEstimateModalOpen(false)}
+                  onClick={() => { setEstimateModalOpen(false); setEstimateFile(null); setEstimateForm({price: '', message: ''}); }}
                   style={{ flex: 1, padding: '12px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}
                 >
                   취소
                 </button>
                 <button 
                   type="submit" 
-                  disabled={sendingEstimate}
-                  style={{ flex: 2, padding: '12px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}
+                  disabled={sendingEstimate || !estimateFile}
+                  style={{ flex: 2, padding: '12px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: (sendingEstimate || !estimateFile) ? 'not-allowed' : 'pointer', opacity: (sendingEstimate || !estimateFile) ? 0.7 : 1 }}
                 >
                   {sendingEstimate ? '발송 중...' : '견적서 메일 전송하기'}
                 </button>

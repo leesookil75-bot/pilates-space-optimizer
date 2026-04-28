@@ -24,6 +24,12 @@ export default function AdminDashboard() {
   const [teaserType, setTeaserType] = useState<'equipment' | 'interior'>('equipment');
   const [sendingTeaser, setSendingTeaser] = useState(false);
 
+  // Estimates Modal state
+  const [estimatesModalOpen, setEstimatesModalOpen] = useState(false);
+  const [selectedQuoteEstimates, setSelectedQuoteEstimates] = useState<any[]>([]);
+  const [fetchingEstimates, setFetchingEstimates] = useState(false);
+  const [viewingEstimateQuoteId, setViewingEstimateQuoteId] = useState('');
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -106,6 +112,27 @@ export default function AdminDashboard() {
       }
     } catch (err) {
       alert('서버 통신 오류');
+    }
+  };
+
+  const handleViewEstimates = async (quoteId: string) => {
+    setEstimatesModalOpen(true);
+    setFetchingEstimates(true);
+    setViewingEstimateQuoteId(quoteId);
+    setSelectedQuoteEstimates([]);
+
+    try {
+      const res = await fetch(`/api/admin/quotes/estimates?quoteId=${quoteId}`);
+      const data = await res.json();
+      if (res.ok) {
+        setSelectedQuoteEstimates(data.estimates || []);
+      } else {
+        alert(data.error || '견적 내역을 불러오는데 실패했습니다.');
+      }
+    } catch (err) {
+      alert('서버 통신 오류');
+    } finally {
+      setFetchingEstimates(false);
     }
   };
 
@@ -441,6 +468,12 @@ export default function AdminDashboard() {
                       >
                         📧 영업 발송
                       </button>
+                      <button 
+                        onClick={() => handleViewEstimates(q.id)}
+                        style={{ background: '#f59e0b', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
+                      >
+                        📄 접수된 견적
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -620,6 +653,62 @@ export default function AdminDashboard() {
                 {sendingTeaser ? '발송 중...' : '🚀 이메일 일괄 발송하기'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Estimates Modal */}
+      {estimatesModalOpen && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+          <div style={{ background: 'white', padding: '32px', borderRadius: '16px', maxWidth: '700px', width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #f3f4f6', paddingBottom: '16px', marginBottom: '24px' }}>
+              <h2 style={{ margin: 0, fontSize: '20px', color: '#111827' }}>접수된 견적 내역</h2>
+              <button 
+                onClick={() => setEstimatesModalOpen(false)}
+                style={{ background: 'none', border: 'none', fontSize: '24px', color: '#9ca3af', cursor: 'pointer' }}
+              >
+                &times;
+              </button>
+            </div>
+
+            {fetchingEstimates ? (
+              <div style={{ textAlign: 'center', padding: '40px 0', color: '#6b7280' }}>
+                데이터를 불러오는 중입니다...
+              </div>
+            ) : selectedQuoteEstimates.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px 0', color: '#6b7280', background: '#f9fafb', borderRadius: '8px' }}>
+                아직 이 오더에 접수된 견적이 없습니다.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {selectedQuoteEstimates.map(est => (
+                  <div key={est.id} style={{ border: '1px solid #e5e7eb', borderRadius: '12px', padding: '20px', background: '#f8fafc' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                      <div>
+                        <h3 style={{ margin: '0 0 4px 0', color: '#0f172a', fontSize: '16px' }}>{est.partnerName}</h3>
+                        <div style={{ fontSize: '13px', color: '#64748b' }}>접수일시: {new Date(est.createdAt).toLocaleString()}</div>
+                      </div>
+                      <div style={{ background: '#fef3c7', color: '#d97706', padding: '6px 12px', borderRadius: '20px', fontWeight: 'bold', fontSize: '15px' }}>
+                        {est.price ? `${parseInt(est.price).toLocaleString()} 원` : '금액 미기재'}
+                      </div>
+                    </div>
+                    
+                    <div style={{ background: 'white', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '14px', color: '#334155', minHeight: '60px', whiteSpace: 'pre-wrap', marginBottom: '16px' }}>
+                      {est.message || '작성된 어필 메시지가 없습니다.'}
+                    </div>
+
+                    <a 
+                      href={est.fileUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      style={{ display: 'inline-block', background: '#3b82f6', color: 'white', padding: '10px 16px', borderRadius: '6px', textDecoration: 'none', fontWeight: 'bold', fontSize: '13px', textAlign: 'center', width: '100%', boxSizing: 'border-box' }}
+                    >
+                      📎 견적서 파일 확인 (PDF/JPG)
+                    </a>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

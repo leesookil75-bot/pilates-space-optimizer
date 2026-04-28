@@ -6,10 +6,10 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
-    const { partnerId, password, quoteId, estimatePrice, message } = await req.json();
+    const { partnerId, password, quoteId, estimatePrice, message, fileUrl } = await req.json();
 
-    if (!partnerId || !password || !quoteId || !estimatePrice) {
-      return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
+    if (!partnerId || !password || !quoteId || !fileUrl) {
+      return NextResponse.json({ error: 'Missing parameters. File attachment is required.' }, { status: 400 });
     }
 
     // 1. Verify partner
@@ -80,14 +80,16 @@ export async function POST(req: Request) {
             <p style="font-size: 16px; color: #374151;">고객님께서 요청하신 <strong>${quoteData.region}</strong> 지역 필라테스 센터 오픈 건에 대해 제휴 파트너사의 맞춤 견적이 도착했습니다.</p>
             
             <div style="background-color: #f3f4f6; border-radius: 8px; padding: 24px; margin: 24px 0;">
-              <h2 style="margin-top: 0; color: #111827; font-size: 18px; border-bottom: 2px solid #d1d5db; padding-bottom: 8px;">제안 견적 요약</h2>
+              <h2 style="margin-top: 0; color: #111827; font-size: 18px; border-bottom: 2px solid #d1d5db; padding-bottom: 8px;">제안 내역 요약</h2>
               <table style="width: 100%; border-collapse: collapse;">
+                ${estimatePrice ? `
                 <tr>
-                  <td style="padding: 8px 0; color: #6b7280; font-weight: bold; width: 100px;">예상 견적가</td>
-                  <td style="padding: 8px 0; color: #ef4444; font-size: 20px; font-weight: bold;">${formatPrice(estimatePrice)} 원</td>
+                  <td style="padding: 8px 0; color: #6b7280; font-weight: bold; width: 100px;">예상 총액</td>
+                  <td style="padding: 8px 0; color: #ef4444; font-size: 20px; font-weight: bold;">대략 ${formatPrice(estimatePrice)} 원</td>
                 </tr>
+                ` : ''}
                 <tr>
-                  <td style="padding: 8px 0; color: #6b7280; font-weight: bold;">제안 업체</td>
+                  <td style="padding: 8px 0; color: #6b7280; font-weight: bold; width: 100px;">제안 업체</td>
                   <td style="padding: 8px 0; color: #111827;">${partnerData.companyName}</td>
                 </tr>
                 <tr>
@@ -101,9 +103,16 @@ export async function POST(req: Request) {
               </table>
             </div>
 
+            <div style="text-align: center; margin: 32px 0;">
+              <p style="color: #4b5563; font-size: 15px; margin-bottom: 16px; font-weight: bold;">👇 아래 버튼을 클릭하여 첨부된 견적서(PDF/JPG)를 확인해 보세요!</p>
+              <a href="${fileUrl}" target="_blank" style="display: inline-block; background-color: #f97316; color: white; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: bold; font-size: 18px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                📎 내 견적서 파일 열기
+              </a>
+            </div>
+
             <h3 style="color: #374151; font-size: 16px; margin-bottom: 8px;">업체 전달 메시지</h3>
             <div style="background-color: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; color: #4b5563; white-space: pre-wrap; line-height: 1.6;">
-              ${message || '전달된 상세 메시지가 없습니다. 전화로 직접 문의해 주세요!'}
+              ${message || '전달된 상세 메시지가 없습니다. 견적서를 확인해 주세요!'}
             </div>
 
             <div style="margin-top: 32px; text-align: center;">
@@ -137,6 +146,17 @@ export async function POST(req: Request) {
     await adminDb.collection('quote_requests').doc(quoteId).update({
       estimatesSent: FieldValue.arrayUnion(partnerId)
     }).catch(e => console.error("Error updating estimatesSent:", e));
+
+    // 8. Log the estimate in sent_estimates collection for Admin Tracking
+    await adminDb.collection('sent_estimates').add({
+      quoteId,
+      partnerId,
+      partnerName: partnerData.companyName,
+      price: estimatePrice || null,
+      message: message || '',
+      fileUrl,
+      createdAt: FieldValue.serverTimestamp()
+    }).catch(e => console.error("Error logging sent_estimate:", e));
 
     return NextResponse.json({ success: true, isFreeToSend, coinsDeducted: isFreeToSend ? 0 : estimateCost });
   } catch (error: any) {
