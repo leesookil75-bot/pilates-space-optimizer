@@ -351,7 +351,7 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
           }}
           style={{ cursor: 'grab' }}
         >
-          <Layer>
+          <Layer listening={false}>
             <Grid 
               width={stageSize.width} 
               height={stageSize.height} 
@@ -359,6 +359,8 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
               stageX={position.x} 
               stageY={position.y} 
             />
+          </Layer>
+          <Layer>
             {/* Rooms Layer */}
             {displayRooms.map((room, index) => (
               <FloorPlan 
@@ -377,6 +379,8 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
                 onDragEnd={handleRoomDragEnd}
               />
             ))}
+          </Layer>
+          <Layer>
             {/* Equipment Layer */}
             {displayEquipments.map((eq, i) => (
               <Equipment
@@ -394,7 +398,8 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
                 scale={scale}
               />
             ))}
-            
+          </Layer>
+          <Layer>
             {/* Room Labels & Move Handles (Always on top) */}
             {displayRooms.map((room, index) => {
               const { areaSqm, areaPyeong } = calculateRoomAreaInfo(room.points);

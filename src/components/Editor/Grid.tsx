@@ -1,4 +1,5 @@
 'use client';
+import React from 'react';
 import { Line } from 'react-konva';
 
 interface GridProps {
@@ -9,7 +10,7 @@ interface GridProps {
   stageY: number;
 }
 
-export default function Grid({ width, height, scale, stageX, stageY }: GridProps) {
+function Grid({ width, height, scale, stageX, stageY }: GridProps) {
   const drawGrid = (cellSize: number, color: string, strokeWidth: number, dash: number[] = []) => {
     const startX = Math.floor((-stageX / scale) / cellSize) * cellSize;
     const startY = Math.floor((-stageY / scale) / cellSize) * cellSize;
@@ -70,3 +71,5 @@ export default function Grid({ width, height, scale, stageX, stageY }: GridProps
 
   return <>{lines}</>;
 }
+
+export default React.memo(Grid);

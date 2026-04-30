@@ -26,7 +26,9 @@ const snapToGrid = (val: number, scale: number) => {
   return Math.round(val / snapSize) * snapSize;
 };
 
-export default function FloorPlan({ room, hasInnerRooms = false, onChange, scale, readOnly = false, onDragStart, onDragMove, onDragEnd }: FloorPlanProps) {
+import React, { useMemo } from 'react';
+
+function FloorPlan({ room, hasInnerRooms = false, onChange, scale, readOnly = false, onDragStart, onDragMove, onDragEnd }: FloorPlanProps) {
   const points = room.points;
   const isOuter = room.type === 'outer';
   const colorTheme = room.colorTheme;
@@ -281,3 +283,12 @@ export default function FloorPlan({ room, hasInnerRooms = false, onChange, scale
     </Group>
   );
 }
+
+export default React.memo(FloorPlan, (prevProps, nextProps) => {
+  return (
+    prevProps.room === nextProps.room &&
+    prevProps.hasInnerRooms === nextProps.hasInnerRooms &&
+    prevProps.scale === nextProps.scale &&
+    prevProps.readOnly === nextProps.readOnly
+  );
+});

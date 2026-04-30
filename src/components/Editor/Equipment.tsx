@@ -47,7 +47,7 @@ const snapToGrid = (val: number, scale: number) => {
   return Math.round(val / snapSize) * snapSize;
 };
 
-export default function Equipment({ data, isSelected, onSelect, onChange, scale }: EquipmentProps) {
+function Equipment({ data, isSelected, onSelect, onChange, scale }: EquipmentProps) {
   const shapeRef = useRef<Konva.Group>(null);
   const trRef = useRef<Konva.Transformer>(null);
 
@@ -227,3 +227,11 @@ export default function Equipment({ data, isSelected, onSelect, onChange, scale 
     </React.Fragment>
   );
 }
+
+export default React.memo(Equipment, (prevProps, nextProps) => {
+  return (
+    prevProps.data === nextProps.data &&
+    prevProps.isSelected === nextProps.isSelected &&
+    prevProps.scale === nextProps.scale
+  );
+});
