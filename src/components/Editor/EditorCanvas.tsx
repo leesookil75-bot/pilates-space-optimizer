@@ -48,6 +48,7 @@ export interface EditorCanvasHandle {
 
 export default function EditorCanvas({ equipments, setEquipments, rooms, setRooms, selectedId, setSelectedId, editorRef, readOnly = false }: EditorCanvasProps) {
   const stageRef = useRef<Konva.Stage>(null);
+  const mainLayerRef = useRef<Konva.Layer>(null);
   
   // Responsive stage sizing
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
@@ -386,7 +387,7 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
           }}
           style={{ cursor: 'grab' }}
         >
-          <Layer listening={false}>
+          <Layer ref={mainLayerRef}>
             <Grid 
               width={stageSize.width} 
               height={stageSize.height} 
@@ -394,9 +395,7 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
               stageX={position.x} 
               stageY={position.y} 
             />
-          </Layer>
-          <Layer>
-            {/* Rooms Layer */}
+            {/* Rooms */}
             {rooms.map((room, index) => (
               <FloorPlan 
                 key={room.id}
@@ -414,8 +413,6 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
                 onDragEnd={handleRoomDragEnd}
               />
             ))}
-          </Layer>
-          <Layer>
             {/* Equipment Layer */}
             {equipments.map((eq, i) => (
               <Equipment
@@ -433,8 +430,6 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
                 scale={scale}
               />
             ))}
-          </Layer>
-          <Layer>
             {/* Room Labels & Move Handles (Always on top) */}
             {rooms.map((room, index) => {
               const { areaSqm, areaPyeong } = calculateRoomAreaInfo(room.points);
@@ -479,7 +474,7 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
                     if (container && !isOuter && !readOnly) container.style.cursor = 'grab';
                   }}
                 >
-                  <Tag fill="rgba(255,255,255,0.9)" stroke="#d1d5db" strokeWidth={1} cornerRadius={12} shadowColor="black" shadowBlur={4} shadowOpacity={0.1} />
+                  <Tag fill="rgba(255,255,255,0.9)" stroke="#d1d5db" strokeWidth={1} cornerRadius={12} />
                   <KonvaText
                     text={isOuter ? textStr : `✥  ${textStr}`}
                     fontSize={12}

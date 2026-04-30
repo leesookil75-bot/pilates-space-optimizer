@@ -189,10 +189,6 @@ function Equipment({ data, isSelected, onSelect, onChange, scale }: EquipmentPro
               stroke="#000"
               strokeWidth={isSelected ? 2 : 1}
               cornerRadius={4}
-              shadowColor="black"
-              shadowBlur={isSelected ? 10 : 5}
-              shadowOpacity={0.2}
-              shadowOffsetY={2}
             />
             <Text
               x={dims.width / 2}
