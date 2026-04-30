@@ -1,9 +1,12 @@
-import { RoomData, Point } from '@/app/page';
+import { RoomData } from '@/app/page';
 import { EquipmentData, EquipmentType, EQUIPMENT_DIMS } from '@/components/Editor/Equipment';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface AILayoutParams {
+  mode: 'pyeong' | 'dimensions' | 'manual';
   pyeong: number;
+  widthM: number;
+  heightM: number;
   groupCount: number;
   groupRooms: {
     reformer: boolean;
@@ -194,19 +197,29 @@ export function generateAILayout(params: AILayoutParams): { rooms: RoomData[], e
   }
 
   // 3. Calculate Outer Wall Dimensions
-  const totalPx = (params.pyeong * 3.3057) * 2500;
-  const corridorWidth = 80; // 1.6m wide hallway
-  
-  const minOuterW = Math.max(topWidth, bottomWidth) + 40; // 40px padding for safety
-  const maxTopH = Math.max(...topBlocks.map(b => b.h), 0);
-  const maxBotH = Math.max(...bottomBlocks.map(b => b.h), 0);
-  const minOuterH = maxTopH + maxBotH + corridorWidth;
+  let finalOuterW = 0;
+  let finalOuterH = 0;
 
-  // If requested pyeong is too small, we just forcefully expand the outer wall to fit the layout.
-  // Expand outer wall to match requested pyeong proportionally if it's larger
-  const ratio = minOuterW / minOuterH;
-  const finalOuterH = Math.max(minOuterH, Math.sqrt(totalPx / ratio));
-  const finalOuterW = Math.max(minOuterW, finalOuterH * ratio);
+  if (params.mode === 'dimensions') {
+    // 1m = 50px
+    finalOuterW = params.widthM * 50;
+    finalOuterH = params.heightM * 50;
+  } else {
+    // Mode is pyeong
+    const totalPx = (params.pyeong * 3.3057) * 2500;
+    const corridorWidth = 80; // 1.6m wide hallway
+    
+    const minOuterW = Math.max(topWidth, bottomWidth) + 40; // 40px padding for safety
+    const maxTopH = Math.max(...topBlocks.map(b => b.h), 0);
+    const maxBotH = Math.max(...bottomBlocks.map(b => b.h), 0);
+    const minOuterH = maxTopH + maxBotH + corridorWidth;
+
+    // If requested pyeong is too small, we just forcefully expand the outer wall to fit the layout.
+    // Expand outer wall to match requested pyeong proportionally if it's larger
+    const ratio = minOuterW / minOuterH;
+    finalOuterH = Math.max(minOuterH, Math.sqrt(totalPx / ratio));
+    finalOuterW = Math.max(minOuterW, finalOuterH * ratio);
+  }
 
   const startX = 100;
   const startY = 100;
@@ -215,7 +228,12 @@ export function generateAILayout(params: AILayoutParams): { rooms: RoomData[], e
   rooms.push(createRoom('전체 외벽', 'outer', startX, startY, finalOuterW, finalOuterH, '#f8fafc'));
 
   // Explicitly draw the Corridor as a Room so the user clearly sees it
-  rooms.push(createRoom('메인 복도', 'inner', startX, startY + maxTopH, finalOuterW, finalOuterH - maxTopH - maxBotH, '#e2e8f0'));
+  if (topBlocks.length > 0 || bottomBlocks.length > 0) {
+    const maxTopH = Math.max(...topBlocks.map(b => b.h), 0);
+    const maxBotH = Math.max(...bottomBlocks.map(b => b.h), 0);
+    const corridorH = Math.max(80, finalOuterH - maxTopH - maxBotH);
+    rooms.push(createRoom('메인 복도', 'inner', startX, startY + maxTopH, finalOuterW, corridorH, '#e2e8f0'));
+  }
 
   // Main Entrance Door (right side, bottom corner)
   equipments.push(createEq('Door', startX + finalOuterW, startY + finalOuterH - 45, -90, undefined, 45, 45));
