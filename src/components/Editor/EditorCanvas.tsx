@@ -89,19 +89,25 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
 
     // Natively move equipments
     if (draggingEquipmentsRef.current.length > 0) {
+      let eqLayer: any = null;
       draggingEquipmentsRef.current.forEach(eqId => {
         const node = stage.findOne(`#eq-${eqId}`);
         const initialEq = initialEquipmentsRef.current.find(e => e.id === eqId);
         if (node && initialEq) {
           node.position({ x: initialEq.x + dx, y: initialEq.y + dy });
+          if (!eqLayer) eqLayer = node.getLayer();
         }
       });
+      if (eqLayer) eqLayer.batchDraw();
     }
 
     // Natively move the other part
     if (source === 'badge') {
       const roomNode = stage.findOne(`#room-${room.id}`);
-      if (roomNode) roomNode.position({ x: dx, y: dy });
+      if (roomNode) {
+        roomNode.position({ x: dx, y: dy });
+        roomNode.getLayer()?.batchDraw();
+      }
     } else {
       const badgeNode = stage.findOne(`#badge-${room.id}`);
       if (badgeNode) {
@@ -109,6 +115,7 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
         const minY = Math.min(...initialRoomPointsRef.current.map((p) => p.y));
         const isOuter = room.type === 'outer';
         badgeNode.position({ x: minX + (isOuter ? 20 : 10) + dx, y: minY + (isOuter ? 20 : 10) + dy });
+        badgeNode.getLayer()?.batchDraw();
       }
     }
   };
