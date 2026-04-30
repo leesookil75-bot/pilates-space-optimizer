@@ -26,7 +26,7 @@ const snapToGrid = (val: number, scale: number) => {
   return Math.round(val / snapSize) * snapSize;
 };
 
-import React, { useMemo } from 'react';
+
 
 function FloorPlan({ room, hasInnerRooms = false, onChange, scale, readOnly = false, onDragStart, onDragMove, onDragEnd }: FloorPlanProps) {
   const points = room.points;

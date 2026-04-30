@@ -1,6 +1,6 @@
 'use client';
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
-import { Stage, Layer, Label, Tag, Text as KonvaText, Group } from 'react-konva';
+import { Stage, Layer, Label, Tag, Text as KonvaText } from 'react-konva';
 import Konva from 'konva';
 import Grid from './Grid';
 import FloorPlan from './FloorPlan';
