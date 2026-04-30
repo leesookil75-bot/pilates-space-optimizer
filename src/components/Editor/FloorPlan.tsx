@@ -60,44 +60,22 @@ export default function FloorPlan({ room, hasInnerRooms = false, onChange, scale
     onChange(newPoints);
   };
 
-  // Calculate polygon area (Shoelace formula)
-  const calculateArea = () => {
-    let area = 0;
-    const j = points.length - 1;
-    for (let i = 0; i < points.length; i++) {
-      area += (points[j].x + points[i].x) * (points[j].y - points[i].y);
-    }
-    return Math.abs(area / 2);
-  };
-
-
-  // 1 cell (50x50px) = 1 sqm for example purposes. 1 pyeong is ~3.3 sqm
-  // But let's say 50px = 1 meter. So 1 cell = 1 sqm.
-  const CELL_SIZE = 50;
-  const areaSqm = calculateArea() / (CELL_SIZE * CELL_SIZE);
-  const areaPyeong = areaSqm / 3.3058;
-
-  // Find center for text
-  const centerX = points.reduce((sum, p) => sum + p.x, 0) / points.length;
-  let centerY = points.reduce((sum, p) => sum + p.y, 0) / points.length;
-
-  // If this is the outer wall and there are inner rooms, move the text completely outside
-  // the floor plan (below the bottom dimension line) to avoid overlaps.
-  if (isOuter && hasInnerRooms) {
-    const maxY = Math.max(...points.map(p => p.y));
-    centerY = maxY + 100 / scale; // Place it completely outside, below the dimension lines
-  }
-
   return (
     <Group 
       draggable={!isOuter}
       onDragStart={(e) => {
         if (e.target !== e.currentTarget) return;
+        // e.target.setAttr('startX', e.target.x()); // Save start pos if needed
+        // e.target.setAttr('startY', e.target.y());
         onDragStart && onDragStart();
       }}
       onDragMove={(e) => {
         if (e.target !== e.currentTarget) return;
-        onDragMove && onDragMove(e.target.x(), e.target.y());
+        // Calculate absolute dx, dy from 0,0 since we reset it onDragEnd previously?
+        // Wait, if we don't reset in onDragMove, e.target.x() is the accumulated dx!
+        const dx = e.target.x();
+        const dy = e.target.y();
+        onDragMove && onDragMove(dx, dy);
       }}
       onDragEnd={(e) => {
         if (e.target !== e.currentTarget) return; // Ignore drag ends from child nodes
@@ -106,12 +84,6 @@ export default function FloorPlan({ room, hasInnerRooms = false, onChange, scale
         e.target.position({ x: 0, y: 0 }); // Reset visual position immediately
         
         onDragEnd && onDragEnd(dx, dy);
-
-        const newPoints = points.map(p => ({
-          x: p.x + dx,
-          y: p.y + dy
-        }));
-        onChange(newPoints);
       }}
       dragBoundFunc={function(this: any, pos) {
         if (isOuter) return pos;
@@ -143,40 +115,6 @@ export default function FloorPlan({ room, hasInnerRooms = false, onChange, scale
           const container = e.target.getStage()?.container();
           if (container && !isOuter) container.style.cursor = 'grab';
         }}
-      />
-
-      {/* Move Handle Icon */}
-      {!isOuter && !readOnly && (
-        <Group x={centerX} y={centerY - 45 / scale}>
-          <Circle radius={14 / scale} fill="white" stroke="#d1d5db" strokeWidth={1 / scale} shadowColor="black" shadowBlur={4} shadowOpacity={0.1} />
-          <Text
-            x={-10 / scale}
-            y={-10 / scale}
-            text="✥"
-            fontSize={20 / scale}
-            fill="#4b5563"
-            onMouseEnter={(e) => {
-              const container = e.target.getStage()?.container();
-              if (container) container.style.cursor = 'move';
-            }}
-            onMouseLeave={(e) => {
-              const container = e.target.getStage()?.container();
-              if (container) container.style.cursor = 'grab';
-            }}
-          />
-        </Group>
-      )}
-
-      {/* Area Text & Room Name */}
-      <Text
-        x={centerX - 50}
-        y={centerY - 20} // shifted up slightly to fit name
-        text={`${room.name}\n\n${areaPyeong.toFixed(1)} 평\n(${areaSqm.toFixed(1)} m²)`}
-        fontSize={16 / scale}
-        fontFamily="sans-serif"
-        fontStyle="bold"
-        fill={strokeColor}
-        align="center"
       />
 
       {/* Draggable Vertex Points */}

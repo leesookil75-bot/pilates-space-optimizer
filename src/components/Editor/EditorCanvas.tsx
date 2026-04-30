@@ -1,6 +1,6 @@
 'use client';
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
-import { Stage, Layer } from 'react-konva';
+import { Stage, Layer, Label, Tag, Text as KonvaText, Group } from 'react-konva';
 import Konva from 'konva';
 import Grid from './Grid';
 import FloorPlan from './FloorPlan';
@@ -18,6 +18,18 @@ function isPointInPolygon(point: Point, vs: Point[]) {
   }
   return inside;
 }
+
+export const calculateRoomAreaInfo = (points: Point[]) => {
+  let area = 0;
+  const j = points.length - 1;
+  for (let i = 0; i < points.length; i++) {
+    area += (points[j].x + points[i].x) * (points[j].y - points[i].y);
+  }
+  const areaPx = Math.abs(area / 2);
+  const areaSqm = areaPx / (50 * 50);
+  const areaPyeong = areaSqm / 3.3058;
+  return { areaSqm, areaPyeong };
+};
 
 interface EditorCanvasProps {
   equipments: EquipmentData[];
@@ -50,32 +62,61 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
   const lastDist = useRef<number>(0);
   const wasPinching = useRef<boolean>(false);
 
-  // Room drag state
+  // Room drag preview state
   const draggingEquipmentsRef = useRef<string[]>([]);
   const initialEquipmentsRef = useRef<EquipmentData[]>([]);
+  const initialRoomPointsRef = useRef<Point[]>([]);
+  const draggingRoomIndexRef = useRef<number>(-1);
+  const [previewRooms, setPreviewRooms] = useState<RoomData[] | null>(null);
+  const [previewEquipments, setPreviewEquipments] = useState<EquipmentData[] | null>(null);
 
-  const handleRoomDragStart = (room: RoomData) => {
+  const handleRoomDragStart = (room: RoomData, index: number) => {
     initialEquipmentsRef.current = [...equipments];
+    initialRoomPointsRef.current = [...room.points];
+    draggingRoomIndexRef.current = index;
     const inRoomIds = equipments
       .filter((eq) => isPointInPolygon({ x: eq.x, y: eq.y }, room.points))
       .map((eq) => eq.id);
     draggingEquipmentsRef.current = inRoomIds;
+    
+    setPreviewRooms(rooms);
+    setPreviewEquipments(equipments);
   };
 
   const handleRoomDragMove = (dx: number, dy: number) => {
-    if (draggingEquipmentsRef.current.length === 0) return;
-    const newEqs = initialEquipmentsRef.current.map((eq) => {
-      if (draggingEquipmentsRef.current.includes(eq.id)) {
-        return { ...eq, x: eq.x + dx, y: eq.y + dy };
-      }
-      return eq;
-    });
-    setEquipments(newEqs);
+    const roomIndex = draggingRoomIndexRef.current;
+    if (roomIndex === -1) return;
+
+    if (draggingEquipmentsRef.current.length > 0) {
+      const newEqs = initialEquipmentsRef.current.map((eq) => {
+        if (draggingEquipmentsRef.current.includes(eq.id)) {
+          return { ...eq, x: eq.x + dx, y: eq.y + dy };
+        }
+        return eq;
+      });
+      setPreviewEquipments(newEqs);
+    }
+
+    const newRooms = [...(previewRooms || rooms)];
+    newRooms[roomIndex] = {
+      ...newRooms[roomIndex],
+      points: initialRoomPointsRef.current.map(p => ({ x: p.x + dx, y: p.y + dy }))
+    };
+    setPreviewRooms(newRooms);
   };
 
   const handleRoomDragEnd = () => {
+    if (previewRooms) setRooms(previewRooms);
+    if (previewEquipments) setEquipments(previewEquipments);
+    
+    setPreviewRooms(null);
+    setPreviewEquipments(null);
     draggingEquipmentsRef.current = [];
+    draggingRoomIndexRef.current = -1;
   };
+
+  const displayRooms = previewRooms || rooms;
+  const displayEquipments = previewEquipments || equipments;
 
   const checkDeselect = (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
     // deselect when clicked on empty area or grid
@@ -319,25 +360,25 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
               stageY={position.y} 
             />
             {/* Rooms Layer */}
-            {rooms.map((room, index) => (
+            {displayRooms.map((room, index) => (
               <FloorPlan 
                 key={room.id}
                 room={room} 
-                hasInnerRooms={rooms.length > 1}
+                hasInnerRooms={displayRooms.length > 1}
                 onChange={(newPoints) => {
-                  const newRooms = [...rooms];
+                  const newRooms = [...displayRooms];
                   newRooms[index] = { ...room, points: newPoints };
                   setRooms(newRooms);
                 }} 
                 scale={scale}
                 readOnly={readOnly}
-                onDragStart={() => handleRoomDragStart(room)}
+                onDragStart={() => handleRoomDragStart(room, index)}
                 onDragMove={handleRoomDragMove}
                 onDragEnd={handleRoomDragEnd}
               />
             ))}
             {/* Equipment Layer */}
-            {equipments.map((eq, i) => (
+            {displayEquipments.map((eq, i) => (
               <Equipment
                 key={eq.id}
                 data={readOnly ? { ...eq, isLocked: true } : eq}
@@ -346,13 +387,67 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
                   if (!readOnly) setSelectedId(eq.id);
                 }}
                 onChange={(newAttrs) => {
-                  const eqs = equipments.slice();
+                  const eqs = displayEquipments.slice();
                   eqs[i] = newAttrs;
                   setEquipments(eqs);
                 }}
                 scale={scale}
               />
             ))}
+            
+            {/* Room Labels & Move Handles (Always on top) */}
+            {displayRooms.map((room, index) => {
+              const { areaSqm, areaPyeong } = calculateRoomAreaInfo(room.points);
+              const minX = Math.min(...room.points.map((p) => p.x));
+              const minY = Math.min(...room.points.map((p) => p.y));
+              const isOuter = room.type === 'outer';
+              const textStr = isOuter 
+                ? `${room.name} | ${areaPyeong.toFixed(1)}평 (${areaSqm.toFixed(1)}m²)` 
+                : `${room.name} • ${areaPyeong.toFixed(1)}평`;
+
+              return (
+                <Label
+                  key={`badge-${room.id}`}
+                  x={minX + (isOuter ? 20 : 10)}
+                  y={minY + (isOuter ? 20 : 10)}
+                  draggable={!isOuter && !readOnly}
+                  onDragStart={(e) => {
+                    if (e.target !== e.currentTarget) return;
+                    handleRoomDragStart(room, index);
+                  }}
+                  onDragMove={(e) => {
+                    if (e.target !== e.currentTarget) return;
+                    const dx = e.target.x() - (minX + 10);
+                    const dy = e.target.y() - (minY + 10);
+                    e.target.position({ x: minX + 10, y: minY + 10 }); // Reset visual position to avoid double drag
+                    handleRoomDragMove(dx, dy);
+                  }}
+                  onDragEnd={(e) => {
+                    if (e.target !== e.currentTarget) return;
+                    e.target.position({ x: minX + 10, y: minY + 10 }); // Reset visual position
+                    handleRoomDragEnd();
+                  }}
+                  onMouseEnter={(e) => {
+                    const container = e.target.getStage()?.container();
+                    if (container && !isOuter && !readOnly) container.style.cursor = 'move';
+                  }}
+                  onMouseLeave={(e) => {
+                    const container = e.target.getStage()?.container();
+                    if (container && !isOuter && !readOnly) container.style.cursor = 'grab';
+                  }}
+                >
+                  <Tag fill="rgba(255,255,255,0.9)" stroke="#d1d5db" strokeWidth={1} cornerRadius={12} shadowColor="black" shadowBlur={4} shadowOpacity={0.1} />
+                  <KonvaText
+                    text={isOuter ? textStr : `✥  ${textStr}`}
+                    fontSize={12}
+                    fontFamily="sans-serif"
+                    fontStyle="bold"
+                    fill="#374151"
+                    padding={6}
+                  />
+                </Label>
+              );
+            })}
           </Layer>
         </Stage>
       )}
