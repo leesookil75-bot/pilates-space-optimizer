@@ -64,6 +64,7 @@ function FloorPlan({ room, hasInnerRooms = false, onChange, scale, readOnly = fa
 
   return (
     <Group 
+      id={`room-${room.id}`}
       draggable={!isOuter}
       onDragStart={(e) => {
         if (e.target !== e.currentTarget) return;
@@ -109,6 +110,7 @@ function FloorPlan({ room, hasInnerRooms = false, onChange, scale, readOnly = fa
         stroke={strokeColor}
         strokeWidth={4 / scale} // Thicker border to make it easier to click
         lineJoin="round"
+        perfectDrawEnabled={false}
         onMouseEnter={(e) => {
           const container = e.target.getStage()?.container();
           if (container && !isOuter) container.style.cursor = 'move';

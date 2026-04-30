@@ -62,13 +62,11 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
   const lastDist = useRef<number>(0);
   const wasPinching = useRef<boolean>(false);
 
-  // Room drag preview state
+  // Room drag native state
   const draggingEquipmentsRef = useRef<string[]>([]);
   const initialEquipmentsRef = useRef<EquipmentData[]>([]);
   const initialRoomPointsRef = useRef<Point[]>([]);
   const draggingRoomIndexRef = useRef<number>(-1);
-  const [previewRooms, setPreviewRooms] = useState<RoomData[] | null>(null);
-  const [previewEquipments, setPreviewEquipments] = useState<EquipmentData[] | null>(null);
 
   const handleRoomDragStart = (room: RoomData, index: number) => {
     initialEquipmentsRef.current = [...equipments];
@@ -78,14 +76,61 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
       .filter((eq) => isPointInPolygon({ x: eq.x, y: eq.y }, room.points))
       .map((eq) => eq.id);
     draggingEquipmentsRef.current = inRoomIds;
-    
-    setPreviewRooms(rooms);
-    setPreviewEquipments(equipments);
   };
 
-  const handleRoomDragMove = (dx: number, dy: number) => {
+  const handleRoomDragMove = (dx: number, dy: number, source: 'room' | 'badge') => {
     const roomIndex = draggingRoomIndexRef.current;
     if (roomIndex === -1) return;
+
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    const room = rooms[roomIndex];
+
+    // Natively move equipments
+    if (draggingEquipmentsRef.current.length > 0) {
+      draggingEquipmentsRef.current.forEach(eqId => {
+        const node = stage.findOne(`#eq-${eqId}`);
+        const initialEq = initialEquipmentsRef.current.find(e => e.id === eqId);
+        if (node && initialEq) {
+          node.position({ x: initialEq.x + dx, y: initialEq.y + dy });
+        }
+      });
+    }
+
+    // Natively move the other part
+    if (source === 'badge') {
+      const roomNode = stage.findOne(`#room-${room.id}`);
+      if (roomNode) roomNode.position({ x: dx, y: dy });
+    } else {
+      const badgeNode = stage.findOne(`#badge-${room.id}`);
+      if (badgeNode) {
+        const minX = Math.min(...initialRoomPointsRef.current.map((p) => p.x));
+        const minY = Math.min(...initialRoomPointsRef.current.map((p) => p.y));
+        const isOuter = room.type === 'outer';
+        badgeNode.position({ x: minX + (isOuter ? 20 : 10) + dx, y: minY + (isOuter ? 20 : 10) + dy });
+      }
+    }
+  };
+
+  const handleRoomDragEnd = (dx: number, dy: number) => {
+    const roomIndex = draggingRoomIndexRef.current;
+    if (roomIndex === -1) return;
+
+    const stage = stageRef.current;
+    if (stage) {
+      const room = rooms[roomIndex];
+      const roomNode = stage.findOne(`#room-${room.id}`);
+      if (roomNode) roomNode.position({ x: 0, y: 0 }); // reset native position
+    }
+
+    // Update React State ONCE
+    const newRooms = [...rooms];
+    newRooms[roomIndex] = {
+      ...newRooms[roomIndex],
+      points: initialRoomPointsRef.current.map(p => ({ x: p.x + dx, y: p.y + dy }))
+    };
+    setRooms(newRooms);
 
     if (draggingEquipmentsRef.current.length > 0) {
       const newEqs = initialEquipmentsRef.current.map((eq) => {
@@ -94,29 +139,12 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
         }
         return eq;
       });
-      setPreviewEquipments(newEqs);
+      setEquipments(newEqs);
     }
 
-    const newRooms = [...(previewRooms || rooms)];
-    newRooms[roomIndex] = {
-      ...newRooms[roomIndex],
-      points: initialRoomPointsRef.current.map(p => ({ x: p.x + dx, y: p.y + dy }))
-    };
-    setPreviewRooms(newRooms);
-  };
-
-  const handleRoomDragEnd = () => {
-    if (previewRooms) setRooms(previewRooms);
-    if (previewEquipments) setEquipments(previewEquipments);
-    
-    setPreviewRooms(null);
-    setPreviewEquipments(null);
     draggingEquipmentsRef.current = [];
     draggingRoomIndexRef.current = -1;
   };
-
-  const displayRooms = previewRooms || rooms;
-  const displayEquipments = previewEquipments || equipments;
 
   const checkDeselect = (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
     // deselect when clicked on empty area or grid
@@ -362,27 +390,27 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
           </Layer>
           <Layer>
             {/* Rooms Layer */}
-            {displayRooms.map((room, index) => (
+            {rooms.map((room, index) => (
               <FloorPlan 
                 key={room.id}
                 room={room} 
-                hasInnerRooms={displayRooms.length > 1}
+                hasInnerRooms={rooms.length > 1}
                 onChange={(newPoints) => {
-                  const newRooms = [...displayRooms];
+                  const newRooms = [...rooms];
                   newRooms[index] = { ...room, points: newPoints };
                   setRooms(newRooms);
                 }} 
                 scale={scale}
                 readOnly={readOnly}
                 onDragStart={() => handleRoomDragStart(room, index)}
-                onDragMove={handleRoomDragMove}
+                onDragMove={(dx, dy) => handleRoomDragMove(dx, dy, 'room')}
                 onDragEnd={handleRoomDragEnd}
               />
             ))}
           </Layer>
           <Layer>
             {/* Equipment Layer */}
-            {displayEquipments.map((eq, i) => (
+            {equipments.map((eq, i) => (
               <Equipment
                 key={eq.id}
                 data={readOnly ? { ...eq, isLocked: true } : eq}
@@ -391,7 +419,7 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
                   if (!readOnly) setSelectedId(eq.id);
                 }}
                 onChange={(newAttrs) => {
-                  const eqs = displayEquipments.slice();
+                  const eqs = equipments.slice();
                   eqs[i] = newAttrs;
                   setEquipments(eqs);
                 }}
@@ -401,7 +429,7 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
           </Layer>
           <Layer>
             {/* Room Labels & Move Handles (Always on top) */}
-            {displayRooms.map((room, index) => {
+            {rooms.map((room, index) => {
               const { areaSqm, areaPyeong } = calculateRoomAreaInfo(room.points);
               const minX = Math.min(...room.points.map((p) => p.x));
               const minY = Math.min(...room.points.map((p) => p.y));
@@ -413,6 +441,7 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
               return (
                 <Label
                   key={`badge-${room.id}`}
+                  id={`badge-${room.id}`}
                   x={minX + (isOuter ? 20 : 10)}
                   y={minY + (isOuter ? 20 : 10)}
                   draggable={!isOuter && !readOnly}
@@ -424,13 +453,15 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
                     if (e.target !== e.currentTarget) return;
                     const dx = e.target.x() - (minX + 10);
                     const dy = e.target.y() - (minY + 10);
-                    e.target.position({ x: minX + 10, y: minY + 10 }); // Reset visual position to avoid double drag
-                    handleRoomDragMove(dx, dy);
+                    // Native drag moves the badge, so we just move other things
+                    handleRoomDragMove(dx, dy, 'badge');
                   }}
                   onDragEnd={(e) => {
                     if (e.target !== e.currentTarget) return;
-                    e.target.position({ x: minX + 10, y: minY + 10 }); // Reset visual position
-                    handleRoomDragEnd();
+                    const dx = e.target.x() - (minX + 10);
+                    const dy = e.target.y() - (minY + 10);
+                    e.target.position({ x: minX + 10, y: minY + 10 }); // Reset native position
+                    handleRoomDragEnd(dx, dy);
                   }}
                   onMouseEnter={(e) => {
                     const container = e.target.getStage()?.container();

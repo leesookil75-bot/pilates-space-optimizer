@@ -90,6 +90,7 @@ function Equipment({ data, isSelected, onSelect, onChange, scale }: EquipmentPro
   return (
     <React.Fragment>
       <Group
+        id={`eq-${data.id}`}
         ref={shapeRef}
         x={data.x}
         y={data.y}
