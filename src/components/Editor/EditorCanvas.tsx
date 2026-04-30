@@ -8,6 +8,17 @@ import Equipment, { EquipmentData } from './Equipment';
 import { KonvaEventObject } from 'konva/lib/Node';
 import { RoomData, Point } from '@/app/page';
 
+function isPointInPolygon(point: Point, vs: Point[]) {
+  let inside = false;
+  for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+    const xi = vs[i].x, yi = vs[i].y;
+    const xj = vs[j].x, yj = vs[j].y;
+    const intersect = ((yi > point.y) !== (yj > point.y)) && (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
 interface EditorCanvasProps {
   equipments: EquipmentData[];
   setEquipments: (equipments: EquipmentData[]) => void;
@@ -38,6 +49,33 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
   const lastCenter = useRef<{x: number, y: number} | null>(null);
   const lastDist = useRef<number>(0);
   const wasPinching = useRef<boolean>(false);
+
+  // Room drag state
+  const draggingEquipmentsRef = useRef<string[]>([]);
+  const initialEquipmentsRef = useRef<EquipmentData[]>([]);
+
+  const handleRoomDragStart = (room: RoomData) => {
+    initialEquipmentsRef.current = [...equipments];
+    const inRoomIds = equipments
+      .filter((eq) => isPointInPolygon({ x: eq.x, y: eq.y }, room.points))
+      .map((eq) => eq.id);
+    draggingEquipmentsRef.current = inRoomIds;
+  };
+
+  const handleRoomDragMove = (dx: number, dy: number) => {
+    if (draggingEquipmentsRef.current.length === 0) return;
+    const newEqs = initialEquipmentsRef.current.map((eq) => {
+      if (draggingEquipmentsRef.current.includes(eq.id)) {
+        return { ...eq, x: eq.x + dx, y: eq.y + dy };
+      }
+      return eq;
+    });
+    setEquipments(newEqs);
+  };
+
+  const handleRoomDragEnd = () => {
+    draggingEquipmentsRef.current = [];
+  };
 
   const checkDeselect = (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
     // deselect when clicked on empty area or grid
@@ -293,6 +331,9 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
                 }} 
                 scale={scale}
                 readOnly={readOnly}
+                onDragStart={() => handleRoomDragStart(room)}
+                onDragMove={handleRoomDragMove}
+                onDragEnd={handleRoomDragEnd}
               />
             ))}
             {/* Equipment Layer */}

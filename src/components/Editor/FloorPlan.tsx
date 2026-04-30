@@ -9,6 +9,9 @@ interface FloorPlanProps {
   onChange: (newPoints: Point[]) => void;
   scale: number;
   readOnly?: boolean;
+  onDragStart?: () => void;
+  onDragMove?: (dx: number, dy: number) => void;
+  onDragEnd?: (dx: number, dy: number) => void;
 }
 
 const getSnapSize = (scale: number) => {
@@ -23,7 +26,7 @@ const snapToGrid = (val: number, scale: number) => {
   return Math.round(val / snapSize) * snapSize;
 };
 
-export default function FloorPlan({ room, hasInnerRooms = false, onChange, scale, readOnly = false }: FloorPlanProps) {
+export default function FloorPlan({ room, hasInnerRooms = false, onChange, scale, readOnly = false, onDragStart, onDragMove, onDragEnd }: FloorPlanProps) {
   const points = room.points;
   const isOuter = room.type === 'outer';
   const colorTheme = room.colorTheme;
@@ -88,12 +91,22 @@ export default function FloorPlan({ room, hasInnerRooms = false, onChange, scale
   return (
     <Group 
       draggable={!isOuter}
+      onDragStart={(e) => {
+        if (e.target !== e.currentTarget) return;
+        onDragStart && onDragStart();
+      }}
+      onDragMove={(e) => {
+        if (e.target !== e.currentTarget) return;
+        onDragMove && onDragMove(e.target.x(), e.target.y());
+      }}
       onDragEnd={(e) => {
         if (e.target !== e.currentTarget) return; // Ignore drag ends from child nodes
         const dx = e.target.x();
         const dy = e.target.y();
         e.target.position({ x: 0, y: 0 }); // Reset visual position immediately
         
+        onDragEnd && onDragEnd(dx, dy);
+
         const newPoints = points.map(p => ({
           x: p.x + dx,
           y: p.y + dy
@@ -131,6 +144,28 @@ export default function FloorPlan({ room, hasInnerRooms = false, onChange, scale
           if (container && !isOuter) container.style.cursor = 'grab';
         }}
       />
+
+      {/* Move Handle Icon */}
+      {!isOuter && !readOnly && (
+        <Group x={centerX} y={centerY - 45 / scale}>
+          <Circle radius={14 / scale} fill="white" stroke="#d1d5db" strokeWidth={1 / scale} shadowColor="black" shadowBlur={4} shadowOpacity={0.1} />
+          <Text
+            x={-10 / scale}
+            y={-10 / scale}
+            text="✥"
+            fontSize={20 / scale}
+            fill="#4b5563"
+            onMouseEnter={(e) => {
+              const container = e.target.getStage()?.container();
+              if (container) container.style.cursor = 'move';
+            }}
+            onMouseLeave={(e) => {
+              const container = e.target.getStage()?.container();
+              if (container) container.style.cursor = 'grab';
+            }}
+          />
+        </Group>
+      )}
 
       {/* Area Text & Room Name */}
       <Text
