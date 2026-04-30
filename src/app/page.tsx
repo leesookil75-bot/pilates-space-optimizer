@@ -67,12 +67,12 @@ export default function Home() {
   const [showAIModal, setShowAIModal] = useState(false);
   const [aiParams, setAiParams] = useState<{
     mode: 'pyeong' | 'dimensions' | 'manual';
-    pyeong: number;
-    widthM: number;
-    heightM: number;
-    groupCount: number;
+    pyeong: number | '';
+    widthM: number | '';
+    heightM: number | '';
+    groupCount: number | '';
     groupRooms: { reformer: boolean; chair: boolean; barrel: boolean };
-    privateRoomsCount: number;
+    privateRoomsCount: number | '';
     auxiliary: { reception: boolean; consultation: boolean; locker: boolean; lounge: boolean };
   }>({
     mode: 'pyeong',
@@ -182,8 +182,8 @@ export default function Home() {
   const handleGenerateAI = () => {
     if (aiParams.mode === 'manual') {
       // 직접 그리기: 빈 캔버스로 초기화
-      const manualOuterW = aiParams.widthM * 50;
-      const manualOuterH = aiParams.heightM * 50;
+      const manualOuterW = (Number(aiParams.widthM) || 10) * 50;
+      const manualOuterH = (Number(aiParams.heightM) || 10) * 50;
       const newRooms: RoomData[] = [
         {
           id: `outer-${Date.now()}`,
@@ -206,7 +206,14 @@ export default function Home() {
       return;
     }
 
-    const { rooms: newRooms, equipments: newEquips, error } = generateAILayout(aiParams);
+    const { rooms: newRooms, equipments: newEquips, error } = generateAILayout({
+      ...aiParams,
+      pyeong: Number(aiParams.pyeong) || 30,
+      widthM: Number(aiParams.widthM) || 10,
+      heightM: Number(aiParams.heightM) || 10,
+      groupCount: Number(aiParams.groupCount) || 0,
+      privateRoomsCount: Number(aiParams.privateRoomsCount) || 0
+    });
     if (error) {
       alert(error);
       return;
@@ -831,11 +838,11 @@ export default function Home() {
                 <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginBottom: '16px' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '12px', color: '#4b5563', marginBottom: '4px' }}>가로 (m)</label>
-                    <input type="number" value={aiParams.widthM} onChange={e => setAiParams({...aiParams, widthM: parseFloat(e.target.value) || 0})} style={{ width: '80px', padding: '8px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', textAlign: 'center' }} />
+                    <input type="number" value={aiParams.widthM} onChange={e => setAiParams({...aiParams, widthM: e.target.value === '' ? '' : parseFloat(e.target.value)})} style={{ width: '80px', padding: '8px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', textAlign: 'center' }} />
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '12px', color: '#4b5563', marginBottom: '4px' }}>세로 (m)</label>
-                    <input type="number" value={aiParams.heightM} onChange={e => setAiParams({...aiParams, heightM: parseFloat(e.target.value) || 0})} style={{ width: '80px', padding: '8px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', textAlign: 'center' }} />
+                    <input type="number" value={aiParams.heightM} onChange={e => setAiParams({...aiParams, heightM: e.target.value === '' ? '' : parseFloat(e.target.value)})} style={{ width: '80px', padding: '8px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', textAlign: 'center' }} />
                   </div>
                 </div>
               </div>
@@ -847,7 +854,7 @@ export default function Home() {
                     <input 
                       type="number" 
                       value={aiParams.pyeong} 
-                      onChange={e => setAiParams({...aiParams, pyeong: parseInt(e.target.value) || 0})} 
+                      onChange={e => setAiParams({...aiParams, pyeong: e.target.value === '' ? '' : parseInt(e.target.value)})} 
                       style={{ width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }} 
                     />
                   </div>
@@ -858,7 +865,7 @@ export default function Home() {
                       <input 
                         type="number" 
                         value={aiParams.widthM} 
-                        onChange={e => setAiParams({...aiParams, widthM: parseFloat(e.target.value) || 0})} 
+                        onChange={e => setAiParams({...aiParams, widthM: e.target.value === '' ? '' : parseFloat(e.target.value)})} 
                         style={{ width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }} 
                       />
                     </div>
@@ -867,7 +874,7 @@ export default function Home() {
                       <input 
                         type="number" 
                         value={aiParams.heightM} 
-                        onChange={e => setAiParams({...aiParams, heightM: parseFloat(e.target.value) || 0})} 
+                        onChange={e => setAiParams({...aiParams, heightM: e.target.value === '' ? '' : parseFloat(e.target.value)})} 
                         style={{ width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }} 
                       />
                     </div>
@@ -881,7 +888,7 @@ export default function Home() {
                     <input 
                       type="number" 
                       value={aiParams.groupCount} 
-                      onChange={e => setAiParams({...aiParams, groupCount: parseInt(e.target.value) || 0})} 
+                      onChange={e => setAiParams({...aiParams, groupCount: e.target.value === '' ? '' : parseInt(e.target.value)})} 
                       style={{ width: '80px', padding: '6px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px' }} 
                     />
                     <span style={{ fontSize: '12px', color: '#4b5563' }}>명</span>
@@ -909,7 +916,7 @@ export default function Home() {
                     <input 
                       type="number" 
                       value={aiParams.privateRoomsCount} 
-                      onChange={e => setAiParams({...aiParams, privateRoomsCount: parseInt(e.target.value) || 0})} 
+                      onChange={e => setAiParams({...aiParams, privateRoomsCount: e.target.value === '' ? '' : parseInt(e.target.value)})} 
                       style={{ width: '80px', padding: '6px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px' }} 
                     />
                     <span style={{ fontSize: '12px', color: '#4b5563' }}>개</span>
@@ -943,8 +950,8 @@ export default function Home() {
 
             {/* Smart Warning System */}
             {aiParams.mode !== 'manual' && (() => {
-              const reqScore = (aiParams.groupRooms.reformer ? 1 : 0) + (aiParams.groupRooms.chair ? 1 : 0) + (aiParams.groupRooms.barrel ? 1 : 0) + (aiParams.privateRoomsCount * 1.5);
-              const isSmallSpace = (aiParams.mode === 'pyeong' && aiParams.pyeong < 15) || (aiParams.mode === 'dimensions' && aiParams.widthM * aiParams.heightM < 40);
+              const reqScore = (aiParams.groupRooms.reformer ? 1 : 0) + (aiParams.groupRooms.chair ? 1 : 0) + (aiParams.groupRooms.barrel ? 1 : 0) + (Number(aiParams.privateRoomsCount) * 1.5);
+              const isSmallSpace = (aiParams.mode === 'pyeong' && Number(aiParams.pyeong) < 15) || (aiParams.mode === 'dimensions' && Number(aiParams.widthM) * Number(aiParams.heightM) < 40);
               
               if (isSmallSpace && reqScore > 2) {
                 return (
