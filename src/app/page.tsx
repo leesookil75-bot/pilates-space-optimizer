@@ -82,6 +82,21 @@ export default function Home() {
     heightM: 10
   });
 
+  const [showRoomModal, setShowRoomModal] = useState(false);
+  const [newRoomParams, setNewRoomParams] = useState<{
+    name: string;
+    widthM: number | '';
+    heightM: number | '';
+    equipmentType: EquipmentType | 'None';
+    quantity: number | '';
+  }>({
+    name: '새로운 룸',
+    widthM: 4,
+    heightM: 4,
+    equipmentType: 'None',
+    quantity: 1
+  });
+
   const editorRef = useRef<EditorCanvasHandle>(null);
 
   // Load from LocalStorage on mount
@@ -229,21 +244,94 @@ export default function Home() {
     scheduleHistoryCommit({ equipments: newEquipments });
   };
 
-  const addRoom = () => {
-    const newRoom: RoomData = {
-      id: `inner-${Date.now()}`,
+  const handleAddRoomClick = () => {
+    setNewRoomParams({
       name: `룸 ${rooms.length}`,
+      widthM: 4,
+      heightM: 4,
+      equipmentType: 'None',
+      quantity: 1
+    });
+    setShowRoomModal(true);
+    setIsMobileMenuOpen(false);
+  };
+
+  const handleCreateSmartRoom = () => {
+    const w = Number(newRoomParams.widthM) || 4;
+    const h = Number(newRoomParams.heightM) || 4;
+    const qty = Number(newRoomParams.quantity) || 0;
+    const eqType = newRoomParams.equipmentType;
+
+    if (eqType !== 'None' && qty > 0) {
+      const eqDims = EQUIPMENT_DIMS[eqType as EquipmentType];
+      const clearanceM = 0.8;
+      const reqWidthM = (eqDims.width / 50) + clearanceM;
+      const reqHeightM = (eqDims.height / 50) + clearanceM;
+      const reqAreaPerEq = reqWidthM * reqHeightM;
+      const totalReqArea = reqAreaPerEq * qty;
+      const roomArea = w * h;
+
+      if (roomArea < totalReqArea) {
+        const proceed = window.confirm(`⚠️ 기구 수량(${qty}대)에 비해 방의 면적(${roomArea}㎡)이 다소 협소합니다.\n(권장 필요 면적: 약 ${Math.ceil(totalReqArea)}㎡)\n\n기구가 겹치거나 통로가 좁을 수 있습니다. 그래도 생성하시겠습니까?`);
+        if (!proceed) return;
+      }
+    }
+
+    const roomId = `inner-${Date.now()}`;
+    const newRoom: RoomData = {
+      id: roomId,
+      name: newRoomParams.name || `룸 ${rooms.length}`,
       type: 'inner',
       points: [
         { x: 150, y: 150 },
-        { x: 350, y: 150 },
-        { x: 350, y: 350 },
-        { x: 150, y: 350 },
+        { x: 150 + w * 50, y: 150 },
+        { x: 150 + w * 50, y: 150 + h * 50 },
+        { x: 150, y: 150 + h * 50 },
       ],
       colorTheme: '#a855f7' // Purple
     };
-    updateRooms([...rooms, newRoom]);
-    setIsMobileMenuOpen(false); // Close menu on mobile
+
+    let newEquipmentsArr: EquipmentData[] = [];
+    if (eqType !== 'None' && qty > 0) {
+      // Calculate simple grid
+      const cols = Math.ceil(Math.sqrt(qty));
+      const rows = Math.ceil(qty / cols);
+      
+      const paddingX = 40;
+      const paddingY = 40;
+      const startX = 150 + paddingX;
+      const startY = 150 + paddingY;
+      
+      const availableW = (w * 50) - (paddingX * 2);
+      const availableH = (h * 50) - (paddingY * 2);
+      
+      const stepX = cols > 1 ? availableW / (cols - 1) : 0;
+      const stepY = rows > 1 ? availableH / (rows - 1) : 0;
+
+      for (let i = 0; i < qty; i++) {
+        const c = i % cols;
+        const r = Math.floor(i / cols);
+        newEquipmentsArr.push({
+          id: `eq-${Date.now()}-${i}`,
+          type: eqType as EquipmentType,
+          x: startX + (c * stepX),
+          y: startY + (r * stepY),
+          rotation: 0,
+          isLocked: false
+        });
+      }
+    }
+
+    setRooms([...rooms, newRoom]);
+    if (newEquipmentsArr.length > 0) {
+      setEquipments([...equipments, ...newEquipmentsArr]);
+    }
+    scheduleHistoryCommit({ 
+      rooms: [...rooms, newRoom], 
+      equipments: [...equipments, ...newEquipmentsArr] 
+    });
+    
+    setShowRoomModal(false);
   };
 
   const addEquipment = (type: EquipmentType) => {
@@ -740,7 +828,7 @@ export default function Home() {
           </button>
           <button 
             className={styles.toolButton}
-            onClick={addRoom}
+            onClick={handleAddRoomClick}
           >
             + 룸(Room) 추가
           </button>
@@ -987,6 +1075,103 @@ export default function Home() {
             <p style={{ fontSize: '12px', color: '#ef4444', marginTop: '12px', textAlign: 'center' }}>
               ⚠️ 주의: 기존에 그리신 도면과 기구는 모두 초기화됩니다.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Smart Room Add Modal */}
+      {showRoomModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.6)', zIndex: 300,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          backdropFilter: 'blur(4px)'
+        }}>
+          <div style={{
+            background: 'white', padding: '32px', borderRadius: '16px',
+            width: '400px', maxHeight: '90vh', overflowY: 'auto',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+          }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#111827', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
+              <span>➕ 스마트 룸 추가</span>
+              <button onClick={() => setShowRoomModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', color: '#9ca3af' }}>&times;</button>
+            </h2>
+            <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '20px', lineHeight: 1.5 }}>
+              룸 크기를 지정하고, 내부에 자동으로 배치할 기구를 선택하세요.
+            </p>
+
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#4b5563', marginBottom: '4px', fontWeight: 600 }}>룸 이름</label>
+              <input 
+                type="text" 
+                value={newRoomParams.name} 
+                onChange={e => setNewRoomParams({...newRoomParams, name: e.target.value})} 
+                placeholder="예: 리포머 룸"
+                style={{ width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }} 
+              />
+            </div>
+
+            <div style={{ marginBottom: '16px', display: 'flex', gap: '12px' }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', fontSize: '12px', color: '#4b5563', marginBottom: '4px', fontWeight: 600 }}>가로 (m)</label>
+                <input 
+                  type="number" 
+                  value={newRoomParams.widthM} 
+                  onChange={e => setNewRoomParams({...newRoomParams, widthM: e.target.value === '' ? '' : parseFloat(e.target.value)})} 
+                  style={{ width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }} 
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', fontSize: '12px', color: '#4b5563', marginBottom: '4px', fontWeight: 600 }}>세로 (m)</label>
+                <input 
+                  type="number" 
+                  value={newRoomParams.heightM} 
+                  onChange={e => setNewRoomParams({...newRoomParams, heightM: e.target.value === '' ? '' : parseFloat(e.target.value)})} 
+                  style={{ width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }} 
+                />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '16px', padding: '16px', background: '#f3f4f6', borderRadius: '8px' }}>
+              <label style={{ display: 'block', fontSize: '13px', color: '#111827', marginBottom: '8px', fontWeight: 700 }}>자동 배치 기구 (선택)</label>
+              <select 
+                value={newRoomParams.equipmentType} 
+                onChange={e => setNewRoomParams({...newRoomParams, equipmentType: e.target.value as EquipmentType | 'None'})}
+                style={{ width: '100%', padding: '8px', border: '1px solid #d1d5db', borderRadius: '6px', marginBottom: '12px' }}
+              >
+                <option value="None">빈 룸으로 생성</option>
+                <option value="Reformer">리포머</option>
+                <option value="Chair">체어</option>
+                <option value="Barrel">바렐</option>
+                <option value="Cadillac">캐딜락</option>
+              </select>
+
+              {newRoomParams.equipmentType !== 'None' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '12px', color: '#4b5563' }}>기구 수량:</span>
+                  <input 
+                    type="number" 
+                    value={newRoomParams.quantity} 
+                    onChange={e => setNewRoomParams({...newRoomParams, quantity: e.target.value === '' ? '' : parseInt(e.target.value)})} 
+                    style={{ width: '80px', padding: '6px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px' }} 
+                  />
+                  <span style={{ fontSize: '12px', color: '#4b5563' }}>대</span>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={handleCreateSmartRoom}
+              style={{
+                width: '100%',
+                background: '#a855f7',
+                color: 'white', border: 'none', padding: '14px', borderRadius: '8px',
+                fontWeight: 700, fontSize: '1rem', cursor: 'pointer',
+                boxShadow: '0 4px 6px -1px rgba(168, 85, 247, 0.3)'
+              }}
+            >
+              룸 생성 및 캔버스에 추가
+            </button>
           </div>
         </div>
       )}
