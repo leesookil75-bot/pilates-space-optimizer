@@ -2,7 +2,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Editor, { EditorCanvasHandle, calculateRoomAreaInfo } from '@/components/Editor/EditorCanvas';
 import { EquipmentData, EquipmentType, EQUIPMENT_DIMS } from '@/components/Editor/Equipment';
-import { generateAILayout } from '@/lib/layoutGenerator';
 import { useSession, signIn } from 'next-auth/react';
 import styles from './page.module.css';
 
@@ -69,32 +68,18 @@ export default function Home() {
   const [copyQuantity, setCopyQuantity] = useState(1);
   const [copyDirection, setCopyDirection] = useState<'up' | 'down' | 'left' | 'right'>('right');
 
-  // AI Layout Generator State
+  // New Canvas Generator State
   const [showAIModal, setShowAIModal] = useState(false);
   const [aiParams, setAiParams] = useState<{
-    mode: 'pyeong' | 'dimensions' | 'manual';
+    mode: 'pyeong' | 'dimensions';
     pyeong: number | '';
     widthM: number | '';
     heightM: number | '';
-    groupCount: number | '';
-    groupRooms: { reformer: boolean; chair: boolean; barrel: boolean };
-    privateRoomsCount: number | '';
-    auxiliary: { reception: boolean; consultation: boolean; locker: boolean; lounge: boolean };
-    clearanceX: number | '';
-    clearanceY: number | '';
-    layoutShape: 'auto' | 'parallel' | 'l-shape' | 'n-shape' | 'u-shape';
   }>({
     mode: 'pyeong',
     pyeong: 30,
     widthM: 10,
-    heightM: 10,
-    groupCount: 6,
-    groupRooms: { reformer: true, chair: false, barrel: false },
-    privateRoomsCount: 1,
-    auxiliary: { reception: true, consultation: true, locker: true, lounge: false },
-    clearanceX: 80,
-    clearanceY: 80,
-    layoutShape: 'auto'
+    heightM: 10
   });
 
   const editorRef = useRef<EditorCanvasHandle>(null);
@@ -204,86 +189,39 @@ export default function Home() {
   };
 
   const handleGenerateAI = () => {
-    if (aiParams.mode === 'manual') {
-      // 직접 그리기: 빈 캔버스로 초기화
-      const manualOuterW = (Number(aiParams.widthM) || 10) * 50;
-      const manualOuterH = (Number(aiParams.heightM) || 10) * 50;
-      const newRooms: RoomData[] = [
-        {
-          id: `outer-${Date.now()}`,
-          name: '전체 외벽',
-          type: 'outer',
-          points: [
-            { x: 100, y: 100 },
-            { x: 100 + manualOuterW, y: 100 },
-            { x: 100 + manualOuterW, y: 100 + manualOuterH },
-            { x: 100, y: 100 + manualOuterH },
-          ],
-          colorTheme: '#3b82f6'
-        }
-      ];
-      setRooms(newRooms);
-      setEquipments([]);
-      scheduleHistoryCommit({ rooms: newRooms, equipments: [] });
-      setShowAIModal(false);
-      alert('기본 캔버스가 준비되었습니다. 점을 드래그하거나 도구를 사용해 공간을 구성해 보세요!');
-      return;
+    let manualOuterW = 0;
+    let manualOuterH = 0;
+
+    if (aiParams.mode === 'pyeong') {
+      const pyeongVal = Number(aiParams.pyeong) || 30;
+      const totalAreaM2 = pyeongVal * 3.3058;
+      const sideM = Math.sqrt(totalAreaM2);
+      manualOuterW = sideM * 50;
+      manualOuterH = sideM * 50;
+    } else {
+      manualOuterW = (Number(aiParams.widthM) || 10) * 50;
+      manualOuterH = (Number(aiParams.heightM) || 10) * 50;
     }
 
-    const baseParams = {
-      ...aiParams,
-      pyeong: Number(aiParams.pyeong) || 30,
-      widthM: Number(aiParams.widthM) || 10,
-      heightM: Number(aiParams.heightM) || 10,
-      groupCount: Number(aiParams.groupCount) || 0,
-      privateRoomsCount: Number(aiParams.privateRoomsCount) || 0,
-      clearanceX: (Number(aiParams.clearanceX) || 80) / 2,
-      clearanceY: (Number(aiParams.clearanceY) || 80) / 2,
-      layoutShape: aiParams.layoutShape
-    };
-
-    const initialResult = generateAILayout(baseParams);
-    if (initialResult.error) {
-      alert(initialResult.error);
-      return;
-    }
-
-    let finalResult = initialResult;
-    let finalGroupCount = baseParams.groupCount;
-
-    // AI Auto Suggestion: If space is available, try to fit more group members
-    if (!initialResult.isOverflowing && baseParams.groupCount > 0) {
-      let maxFitCount = baseParams.groupCount;
-      // Test up to +6 members
-      for (let i = 1; i <= 6; i++) {
-        const testCount = baseParams.groupCount + i;
-        const testResult = generateAILayout({ ...baseParams, groupCount: testCount });
-        if (testResult.isOverflowing) {
-          break; // Stop if it overflows
-        }
-        maxFitCount = testCount;
+    const newRooms: RoomData[] = [
+      {
+        id: `outer-${Date.now()}`,
+        name: '전체 외벽',
+        type: 'outer',
+        points: [
+          { x: 100, y: 100 },
+          { x: 100 + manualOuterW, y: 100 },
+          { x: 100 + manualOuterW, y: 100 + manualOuterH },
+          { x: 100, y: 100 + manualOuterH },
+        ],
+        colorTheme: '#3b82f6'
       }
-
-      if (maxFitCount > baseParams.groupCount) {
-        const confirmMsg = `💡 여유 공간이 충분합니다!\n\n현재 공간 크기 및 여유 공간 설정(Clearance) 기준으로, 그룹 레슨 인원을 [${maxFitCount}명]까지 늘려도 쾌적하게 배치가 가능합니다.\n피크 타임 수익 극대화를 위해 ${maxFitCount}인 기준으로 다시 설계할까요?`;
-        if (window.confirm(confirmMsg)) {
-          finalResult = generateAILayout({ ...baseParams, groupCount: maxFitCount });
-          finalGroupCount = maxFitCount;
-          setAiParams(prev => ({ ...prev, groupCount: maxFitCount }));
-        }
-      }
-    }
-    
-    setRooms(finalResult.rooms);
-    setEquipments(finalResult.equipments);
-    scheduleHistoryCommit({ rooms: finalResult.rooms, equipments: finalResult.equipments });
+    ];
+    setRooms(newRooms);
+    setEquipments([]);
+    scheduleHistoryCommit({ rooms: newRooms, equipments: [] });
     setShowAIModal(false);
-    
-    if (finalResult.isOverflowing) {
-      alert('⚠️ 공간 부족 알림\n\n설정하신 면적에 비해 요청하신 기구 대수가 많아 일부 기구 및 룸이 외벽 밖으로 초과 배치되었습니다.\n쾌적한 동선을 위해 평수를 넓히시거나 기구 수를 줄여보시길 권장합니다.');
-    } else if (finalGroupCount === baseParams.groupCount) {
-      alert('AI 기반 자동 도면 생성이 완료되었습니다! 기구와 방의 위치를 자유롭게 드래그하여 수정해 보세요.');
-    }
+    alert('기본 캔버스가 준비되었습니다. 룸을 추가하거나 기구를 드래그하여 공간을 구성해 보세요!');
   };
 
   const updateEquipments = (newEquipments: EquipmentData[]) => {
@@ -578,8 +516,8 @@ export default function Home() {
               cursor: 'pointer',
               boxShadow: '0 2px 4px rgba(236, 72, 153, 0.3)'
             }}>
-            <span className={styles.desktopOnly}>✨ AI 자동 도면 기획</span>
-            <span className={styles.mobileOnly}>✨ AI 기획</span>
+            <span className={styles.desktopOnly}>📐 새 도면 시작하기</span>
+            <span className={styles.mobileOnly}>📐 새 도면</span>
           </button>
           <button 
             className={styles.headerButton}
@@ -998,218 +936,53 @@ export default function Home() {
             <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
               <button onClick={() => setAiParams({...aiParams, mode: 'pyeong'})} style={{ flex: 1, padding: '8px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, border: '1px solid #d1d5db', background: aiParams.mode === 'pyeong' ? '#3b82f6' : 'white', color: aiParams.mode === 'pyeong' ? 'white' : '#374151', cursor: 'pointer' }}>평수 입력</button>
               <button onClick={() => setAiParams({...aiParams, mode: 'dimensions'})} style={{ flex: 1, padding: '8px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, border: '1px solid #d1d5db', background: aiParams.mode === 'dimensions' ? '#3b82f6' : 'white', color: aiParams.mode === 'dimensions' ? 'white' : '#374151', cursor: 'pointer' }}>가로x세로 입력</button>
-              <button onClick={() => setAiParams({...aiParams, mode: 'manual'})} style={{ flex: 1, padding: '8px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, border: '1px solid #d1d5db', background: aiParams.mode === 'manual' ? '#3b82f6' : 'white', color: aiParams.mode === 'manual' ? 'white' : '#374151', cursor: 'pointer' }}>직접 그리기</button>
             </div>
 
-            {aiParams.mode === 'manual' ? (
-              <div style={{ padding: '24px', background: '#f3f4f6', borderRadius: '8px', marginBottom: '24px', textAlign: 'center' }}>
-                <div style={{ fontSize: '24px', marginBottom: '12px' }}>✏️</div>
-                <h3 style={{ fontSize: '15px', fontWeight: 700, color: '#111827', marginBottom: '8px' }}>비어있는 캔버스에서 직접 시작하세요</h3>
-                <p style={{ fontSize: '13px', color: '#4b5563', lineHeight: 1.5, marginBottom: '16px' }}>
-                  원하시는 기본 외벽의 크기(m)를 지정하시면,<br/>해당 크기의 네모난 공간이 캔버스에 준비됩니다.
-                </p>
-                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginBottom: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', color: '#4b5563', marginBottom: '4px' }}>가로 (m)</label>
-                    <input type="number" value={aiParams.widthM} onChange={e => setAiParams({...aiParams, widthM: e.target.value === '' ? '' : parseFloat(e.target.value)})} style={{ width: '80px', padding: '8px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', textAlign: 'center' }} />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', color: '#4b5563', marginBottom: '4px' }}>세로 (m)</label>
-                    <input type="number" value={aiParams.heightM} onChange={e => setAiParams({...aiParams, heightM: e.target.value === '' ? '' : parseFloat(e.target.value)})} style={{ width: '80px', padding: '8px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', textAlign: 'center' }} />
-                  </div>
+            <>
+              {aiParams.mode === 'pyeong' ? (
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#4b5563', marginBottom: '4px', fontWeight: 600 }}>전체 평수 (예: 30)</label>
+                  <input 
+                    type="number" 
+                    value={aiParams.pyeong} 
+                    onChange={e => setAiParams({...aiParams, pyeong: e.target.value === '' ? '' : parseInt(e.target.value)})} 
+                    style={{ width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }} 
+                  />
                 </div>
-              </div>
-            ) : (
-              <>
-                {aiParams.mode === 'pyeong' ? (
-                  <div style={{ marginBottom: '16px' }}>
-                    <label style={{ display: 'block', fontSize: '12px', color: '#4b5563', marginBottom: '4px', fontWeight: 600 }}>전체 평수 (예: 30)</label>
+              ) : (
+                <div style={{ marginBottom: '16px', display: 'flex', gap: '12px' }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', fontSize: '12px', color: '#4b5563', marginBottom: '4px', fontWeight: 600 }}>가로 (m)</label>
                     <input 
                       type="number" 
-                      value={aiParams.pyeong} 
-                      onChange={e => setAiParams({...aiParams, pyeong: e.target.value === '' ? '' : parseInt(e.target.value)})} 
+                      value={aiParams.widthM} 
+                      onChange={e => setAiParams({...aiParams, widthM: e.target.value === '' ? '' : parseFloat(e.target.value)})} 
                       style={{ width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }} 
                     />
                   </div>
-                ) : (
-                  <div style={{ marginBottom: '16px', display: 'flex', gap: '12px' }}>
-                    <div style={{ flex: 1 }}>
-                      <label style={{ display: 'block', fontSize: '12px', color: '#4b5563', marginBottom: '4px', fontWeight: 600 }}>가로 (m)</label>
-                      <input 
-                        type="number" 
-                        value={aiParams.widthM} 
-                        onChange={e => setAiParams({...aiParams, widthM: e.target.value === '' ? '' : parseFloat(e.target.value)})} 
-                        style={{ width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }} 
-                      />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <label style={{ display: 'block', fontSize: '12px', color: '#4b5563', marginBottom: '4px', fontWeight: 600 }}>세로 (m)</label>
-                      <input 
-                        type="number" 
-                        value={aiParams.heightM} 
-                        onChange={e => setAiParams({...aiParams, heightM: e.target.value === '' ? '' : parseFloat(e.target.value)})} 
-                        style={{ width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }} 
-                      />
-                    </div>
-                  </div>
-                )}
-
-                <div style={{ marginBottom: '16px', padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
-                  <label style={{ display: 'block', fontSize: '13px', color: '#1e293b', marginBottom: '8px', fontWeight: 700 }}>1.5 공간 분할 형태 (Layout Shape)</label>
-                  <p style={{ fontSize: '11px', color: '#64748b', margin: '0 0 12px 0', lineHeight: 1.4 }}>
-                    전체 공간의 외곽을 따라 기구 방들을 어떻게 배치할지 결정합니다. 가운데 빈 공간은 복도로 자동 할당됩니다.
-                  </p>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    {[
-                      { id: 'auto', label: '자동 (Auto)' },
-                      { id: 'parallel', label: '11자형' },
-                      { id: 'l-shape', label: 'ㄱ자형' },
-                      { id: 'n-shape', label: 'ㄴ자형' },
-                      { id: 'u-shape', label: 'ㄷ자형' }
-                    ].map(shape => (
-                      <button
-                        key={shape.id}
-                        onClick={() => setAiParams({...aiParams, layoutShape: shape.id as any})}
-                        style={{
-                          flex: 1,
-                          padding: '8px 4px',
-                          background: aiParams.layoutShape === shape.id ? '#3b82f6' : 'white',
-                          color: aiParams.layoutShape === shape.id ? 'white' : '#475569',
-                          border: `1px solid ${aiParams.layoutShape === shape.id ? '#3b82f6' : '#cbd5e1'}`,
-                          borderRadius: '6px',
-                          fontSize: '12px',
-                          fontWeight: aiParams.layoutShape === shape.id ? 700 : 500,
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                      >
-                        {shape.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div style={{ marginBottom: '16px', padding: '16px', background: '#f3f4f6', borderRadius: '8px' }}>
-                  <label style={{ display: 'block', fontSize: '13px', color: '#111827', marginBottom: '8px', fontWeight: 700 }}>1. 그룹 레슨룸 구성</label>
-                  <div style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '12px', color: '#4b5563' }}>그룹 레슨 인원수:</span>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', fontSize: '12px', color: '#4b5563', marginBottom: '4px', fontWeight: 600 }}>세로 (m)</label>
                     <input 
                       type="number" 
-                      value={aiParams.groupCount} 
-                      onChange={e => setAiParams({...aiParams, groupCount: e.target.value === '' ? '' : parseInt(e.target.value)})} 
-                      style={{ width: '80px', padding: '6px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px' }} 
+                      value={aiParams.heightM} 
+                      onChange={e => setAiParams({...aiParams, heightM: e.target.value === '' ? '' : parseFloat(e.target.value)})} 
+                      style={{ width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }} 
                     />
-                    <span style={{ fontSize: '12px', color: '#4b5563' }}>명</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '16px', marginTop: '12px' }}>
-                    <label style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
-                      <input type="checkbox" checked={aiParams.groupRooms.reformer} onChange={e => setAiParams({...aiParams, groupRooms: {...aiParams.groupRooms, reformer: e.target.checked}})} />
-                      리포머룸
-                    </label>
-                    <label style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
-                      <input type="checkbox" checked={aiParams.groupRooms.chair} onChange={e => setAiParams({...aiParams, groupRooms: {...aiParams.groupRooms, chair: e.target.checked}})} />
-                      체어룸
-                    </label>
-                    <label style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
-                      <input type="checkbox" checked={aiParams.groupRooms.barrel} onChange={e => setAiParams({...aiParams, groupRooms: {...aiParams.groupRooms, barrel: e.target.checked}})} />
-                      바렐룸
-                    </label>
                   </div>
                 </div>
-
-                <div style={{ marginBottom: '16px', padding: '16px', background: '#f3f4f6', borderRadius: '8px' }}>
-                  <label style={{ display: 'block', fontSize: '13px', color: '#111827', marginBottom: '8px', fontWeight: 700 }}>2. 개인 레슨룸 구성</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '12px', color: '#4b5563' }}>프라이빗(1:1) 룸 개수:</span>
-                    <input 
-                      type="number" 
-                      value={aiParams.privateRoomsCount} 
-                      onChange={e => setAiParams({...aiParams, privateRoomsCount: e.target.value === '' ? '' : parseInt(e.target.value)})} 
-                      style={{ width: '80px', padding: '6px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '13px' }} 
-                    />
-                    <span style={{ fontSize: '12px', color: '#4b5563' }}>개</span>
-                  </div>
-                  <p style={{ fontSize: '11px', color: '#6b7280', margin: '4px 0 0 0' }}>* 각 방에는 대기구 4종이 모두 들어갑니다.</p>
-                </div>
-
-                <div style={{ marginBottom: '16px', padding: '16px', background: '#f3f4f6', borderRadius: '8px' }}>
-                  <label style={{ display: 'block', fontSize: '13px', color: '#111827', marginBottom: '8px', fontWeight: 700 }}>3. 부대시설 선택 (레고 블록 모듈)</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                    <label style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
-                      <input type="checkbox" checked={aiParams.auxiliary.reception} onChange={e => setAiParams({...aiParams, auxiliary: {...aiParams.auxiliary, reception: e.target.checked}})} />
-                      인포데스크/로비
-                    </label>
-                    <label style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
-                      <input type="checkbox" checked={aiParams.auxiliary.consultation} onChange={e => setAiParams({...aiParams, auxiliary: {...aiParams.auxiliary, consultation: e.target.checked}})} />
-                      독립형 상담실
-                    </label>
-                    <label style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
-                      <input type="checkbox" checked={aiParams.auxiliary.locker} onChange={e => setAiParams({...aiParams, auxiliary: {...aiParams.auxiliary, locker: e.target.checked}})} />
-                      남/여 탈의실
-                    </label>
-                    <label style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
-                      <input type="checkbox" checked={aiParams.auxiliary.lounge} onChange={e => setAiParams({...aiParams, auxiliary: {...aiParams.auxiliary, lounge: e.target.checked}})} />
-                      휴게실/라운지
-                    </label>
-                  </div>
-                </div>
-
-                <div style={{ marginBottom: '16px', padding: '16px', background: '#f3f4f6', borderRadius: '8px' }}>
-                  <label style={{ display: 'block', fontSize: '13px', color: '#111827', marginBottom: '8px', fontWeight: 700 }}>4. 기구 여유 공간 설정 (Clearance)</label>
-                  <p style={{ fontSize: '11px', color: '#6b7280', margin: '0 0 12px 0' }}>기구 사이의 간격을 조절하여 쾌적도를 설정합니다. (기본 80cm)</p>
-                  <div style={{ display: 'flex', gap: '12px' }}>
-                    <div style={{ flex: 1 }}>
-                      <label style={{ display: 'block', fontSize: '12px', color: '#4b5563', marginBottom: '4px' }}>좌/우 공간 (cm)</label>
-                      <input 
-                        type="number" 
-                        value={aiParams.clearanceX} 
-                        onChange={e => setAiParams({...aiParams, clearanceX: e.target.value === '' ? '' : parseInt(e.target.value)})} 
-                        style={{ width: '100%', padding: '8px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box' }} 
-                      />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <label style={{ display: 'block', fontSize: '12px', color: '#4b5563', marginBottom: '4px' }}>상/하 공간 (cm)</label>
-                      <input 
-                        type="number" 
-                        value={aiParams.clearanceY} 
-                        onChange={e => setAiParams({...aiParams, clearanceY: e.target.value === '' ? '' : parseInt(e.target.value)})} 
-                        style={{ width: '100%', padding: '8px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box' }} 
-                      />
-                    </div>
-                  </div>
-                </div>
+              )}
               </>
-            )}
-
-            {/* Smart Warning System */}
-            {aiParams.mode !== 'manual' && (() => {
-              const reqScore = (aiParams.groupRooms.reformer ? 1 : 0) + (aiParams.groupRooms.chair ? 1 : 0) + (aiParams.groupRooms.barrel ? 1 : 0) + (Number(aiParams.privateRoomsCount) * 1.5);
-              const isSmallSpace = (aiParams.mode === 'pyeong' && Number(aiParams.pyeong) < 15) || (aiParams.mode === 'dimensions' && Number(aiParams.widthM) * Number(aiParams.heightM) < 40);
-              
-              if (isSmallSpace && reqScore > 2) {
-                return (
-                  <div style={{ padding: '12px', background: '#fef2f2', border: '1px solid #f87171', borderRadius: '8px', marginBottom: '16px', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                    <span style={{ fontSize: '16px' }}>⚠️</span>
-                    <p style={{ fontSize: '12px', color: '#991b1b', margin: 0, lineHeight: 1.4 }}>
-                      입력하신 공간에 비해 요구하시는 기구 및 룸이 많아 <b>외벽 밖으로 배치가 초과될 수 있습니다.</b> 생성 후 직접 드래그하여 조절해주세요.
-                    </p>
-                  </div>
-                );
-              }
-              return null;
-            })()}
-
             <button
               onClick={handleGenerateAI}
               style={{
                 width: '100%',
-                background: aiParams.mode === 'manual' ? '#10b981' : 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)',
+                background: '#10b981',
                 color: 'white', border: 'none', padding: '14px', borderRadius: '8px',
                 fontWeight: 700, fontSize: '1rem', cursor: 'pointer',
-                boxShadow: aiParams.mode === 'manual' ? '0 4px 6px -1px rgba(16, 185, 129, 0.3)' : '0 4px 6px -1px rgba(236, 72, 153, 0.3)'
+                boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.3)'
               }}
             >
-              {aiParams.mode === 'manual' ? '✏️ 빈 캔버스로 시작하기' : '✨ 도면 자동 생성하기'}
+              ✏️ 빈 캔버스로 시작하기
             </button>
             <p style={{ fontSize: '12px', color: '#ef4444', marginTop: '12px', textAlign: 'center' }}>
               ⚠️ 주의: 기존에 그리신 도면과 기구는 모두 초기화됩니다.
