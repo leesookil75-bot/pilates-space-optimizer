@@ -293,20 +293,28 @@ export default function Home() {
 
     let newEquipmentsArr: EquipmentData[] = [];
     if (eqType !== 'None' && qty > 0) {
-      // Calculate simple grid
+      const eqDims = EQUIPMENT_DIMS[eqType as EquipmentType];
+      const clearance = 40; // Default clearance per side
+      const reqW = eqDims.width + (clearance * 2);
+      const reqH = eqDims.height + (clearance * 2);
+
       const cols = Math.ceil(Math.sqrt(qty));
       const rows = Math.ceil(qty / cols);
       
-      const paddingX = 40;
-      const paddingY = 40;
-      const startX = 150 + paddingX;
-      const startY = 150 + paddingY;
+      const minX = 150;
+      const minY = 150;
+      // Start center position so the gray area touches the wall exactly
+      const startX = minX + reqW / 2;
+      const startY = minY + reqH / 2;
       
-      const availableW = (w * 50) - (paddingX * 2);
-      const availableH = (h * 50) - (paddingY * 2);
+      const availableW = w * 50;
+      const availableH = h * 50;
       
-      const stepX = cols > 1 ? availableW / (cols - 1) : 0;
-      const stepY = rows > 1 ? availableH / (rows - 1) : 0;
+      const maxStepX = reqW;
+      const maxStepY = reqH;
+      
+      const stepX = cols > 1 ? Math.min(maxStepX, (availableW - reqW) / (cols - 1)) : 0;
+      const stepY = rows > 1 ? Math.min(maxStepY, (availableH - reqH) / (rows - 1)) : 0;
 
       for (let i = 0; i < qty; i++) {
         const c = i % cols;

@@ -4,7 +4,7 @@ import { Stage, Layer, Label, Tag, Text as KonvaText, Group, Circle } from 'reac
 import Konva from 'konva';
 import Grid from './Grid';
 import FloorPlan from './FloorPlan';
-import Equipment, { EquipmentData } from './Equipment';
+import Equipment, { EquipmentData, EQUIPMENT_DIMS } from './Equipment';
 import { KonvaEventObject } from 'konva/lib/Node';
 import { RoomData, Point } from '@/app/page';
 
@@ -432,21 +432,26 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
                     const cols = Math.ceil(Math.sqrt(qty));
                     const rows = Math.ceil(qty / cols);
                     
-                    const paddingX = 40;
-                    const paddingY = 40;
-                    const startX = minX + paddingX;
-                    const startY = minY + paddingY;
-                    
-                    const availableW = w - (paddingX * 2);
-                    const availableH = h - (paddingY * 2);
-                    
-                    const stepX = cols > 1 ? availableW / (cols - 1) : 0;
-                    const stepY = rows > 1 ? availableH / (rows - 1) : 0;
-                    
                     const newEqs = [...equipments];
                     let eqIdx = 0;
                     for (let j = 0; j < newEqs.length; j++) {
                       if (newEqs[j].linkedRoomId === room.id) {
+                        const eqType = newEqs[j].type;
+                        const eqDims = EQUIPMENT_DIMS[eqType];
+                        const clearance = 40; // Default clearance per side
+                        const reqW = eqDims.width + (clearance * 2);
+                        const reqH = eqDims.height + (clearance * 2);
+
+                        // Start center position so the gray area touches the wall exactly
+                        const startX = minX + reqW / 2;
+                        const startY = minY + reqH / 2;
+
+                        const maxStepX = reqW;
+                        const maxStepY = reqH;
+
+                        const stepX = cols > 1 ? Math.min(maxStepX, (w - reqW) / (cols - 1)) : 0;
+                        const stepY = rows > 1 ? Math.min(maxStepY, (h - reqH) / (rows - 1)) : 0;
+
                         const c = eqIdx % cols;
                         const r = Math.floor(eqIdx / cols);
                         newEqs[j] = {
