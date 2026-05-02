@@ -417,6 +417,49 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
                 onChange={(newPoints) => {
                   const newRooms = [...rooms];
                   newRooms[index] = { ...room, points: newPoints };
+                  
+                  const linkedEqs = equipments.filter(eq => eq.linkedRoomId === room.id);
+                  if (linkedEqs.length > 0) {
+                    const minX = Math.min(...newPoints.map(p => p.x));
+                    const maxX = Math.max(...newPoints.map(p => p.x));
+                    const minY = Math.min(...newPoints.map(p => p.y));
+                    const maxY = Math.max(...newPoints.map(p => p.y));
+                    
+                    const w = maxX - minX;
+                    const h = maxY - minY;
+                    const qty = linkedEqs.length;
+                    
+                    const cols = Math.ceil(Math.sqrt(qty));
+                    const rows = Math.ceil(qty / cols);
+                    
+                    const paddingX = 40;
+                    const paddingY = 40;
+                    const startX = minX + paddingX;
+                    const startY = minY + paddingY;
+                    
+                    const availableW = w - (paddingX * 2);
+                    const availableH = h - (paddingY * 2);
+                    
+                    const stepX = cols > 1 ? availableW / (cols - 1) : 0;
+                    const stepY = rows > 1 ? availableH / (rows - 1) : 0;
+                    
+                    const newEqs = [...equipments];
+                    let eqIdx = 0;
+                    for (let j = 0; j < newEqs.length; j++) {
+                      if (newEqs[j].linkedRoomId === room.id) {
+                        const c = eqIdx % cols;
+                        const r = Math.floor(eqIdx / cols);
+                        newEqs[j] = {
+                          ...newEqs[j],
+                          x: startX + (c * stepX),
+                          y: startY + (r * stepY),
+                        };
+                        eqIdx++;
+                      }
+                    }
+                    setEquipments(newEqs);
+                  }
+                  
                   setRooms(newRooms);
                 }} 
                 scale={scale}

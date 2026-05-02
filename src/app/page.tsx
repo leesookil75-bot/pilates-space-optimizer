@@ -317,7 +317,8 @@ export default function Home() {
           x: startX + (c * stepX),
           y: startY + (r * stepY),
           rotation: 0,
-          isLocked: false
+          isLocked: false,
+          linkedRoomId: roomId
         });
       }
     }

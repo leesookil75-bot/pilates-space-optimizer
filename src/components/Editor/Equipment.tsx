@@ -17,6 +17,7 @@ export interface EquipmentData {
   clearance?: number; // Optional custom clearance in cm
   customLabel?: string; // For 'Custom' type equipments
   isLocked?: boolean; // Lock position and rotation
+  linkedRoomId?: string; // ID of the room this equipment is auto-arranged within
 }
 
 interface EquipmentProps {
@@ -222,6 +223,7 @@ function Equipment({ data, isSelected, onSelect, onChange, scale, rooms = [], al
       x: e.target.x(),
       y: e.target.y(),
       rotation: e.target.rotation(),
+      linkedRoomId: undefined, // Unlink when manually moved
     });
   };
 
