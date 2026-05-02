@@ -335,77 +335,47 @@ export function generateAILayout(params: AILayoutParams): { rooms: RoomData[], e
 
   // 4. Place Blocks
   
+  // 4. Place Blocks (최소 공간 룸 + 오픈 로비)
+  
   // Top Blocks
-  let currentX = startX;
+  let currentX = startX + (layoutShape === 'u-shape' ? maxLeftW : 0);
   for (const b of topBlocks) {
     const rx = currentX;
     const ry = startY; 
-    let roomW = b.w;
-    if (layoutShape === 'l-shape') {
-      roomW = outerMaxX - rx - maxRightW; // Leaves space for Right Blocks
-    } else if (layoutShape === 'u-shape' || layoutShape === 'parallel') {
-      roomW = outerMaxX - rx; // Stretch full width
-    } else {
-      roomW = Math.min(b.w, outerMaxX - rx);
-    }
-    roomW = Math.max(0, roomW);
     
-    // Stretch height to leave 50px corridor
-    let maxStretchH = maxTopH;
-    if (layoutShape === 'parallel' || layoutShape === 'u-shape') {
-      maxStretchH = Math.max(b.h, finalOuterH - maxBotH - 50); 
-    } else if (layoutShape === 'l-shape') {
-      maxStretchH = Math.max(b.h, finalOuterH - 50);
-    }
-    
-    const roomH = Math.max(0, Math.min(maxStretchH, outerMaxY - ry));
+    const roomW = Math.max(0, Math.min(b.w, outerMaxX - rx - (layoutShape === 'l-shape' ? maxRightW : 0)));
+    const roomH = Math.max(0, Math.min(b.h, outerMaxY - ry));
     
     if (roomW > 0 && roomH > 0) {
       rooms.push(createRoom(b.name, 'inner', rx, ry, roomW, roomH, b.color));
     }
-    const offsetY = (roomH - b.h) / 2;
-    b.itemsFn(rx, ry + offsetY);
+    
+    b.itemsFn(rx, ry);
+    
     if (roomW > 45 && roomH > 0) {
+      // Top 블록의 문은 항상 아래쪽 로비를 향함
       equipments.push(createEq('Door', rx + roomW / 2, ry + roomH, 0, undefined, 45, 45));
     }
     currentX += b.w;
   }
 
   // Bottom Blocks
-  currentX = startX;
+  currentX = startX + (layoutShape === 'n-shape' || layoutShape === 'u-shape' ? maxLeftW : 0);
   for (const b of bottomBlocks) {
     const rx = currentX;
-    
-    let maxStretchH = maxBotH;
-    if (layoutShape === 'parallel' || layoutShape === 'u-shape') {
-      maxStretchH = Math.max(b.h, finalOuterH - maxTopH - 50);
-    } else if (layoutShape === 'n-shape') {
-      maxStretchH = Math.max(b.h, finalOuterH - 50);
-    }
-    
-    const roomH = Math.max(0, maxStretchH);
+    const roomW = Math.max(0, Math.min(b.w, outerMaxX - rx));
+    const roomH = Math.max(0, Math.min(b.h, outerMaxY - startY));
     const ry = outerMaxY - roomH;
-    
-    let roomW = b.w;
-    if (layoutShape === 'u-shape' || layoutShape === 'n-shape' || layoutShape === 'parallel') {
-      roomW = outerMaxX - rx - 50; // Leave 50px right corridor for n/u shape. Parallel can be full width.
-      if (layoutShape === 'parallel') roomW = outerMaxX - rx;
-    } else {
-      roomW = Math.min(b.w, outerMaxX - rx);
-    }
-    roomW = Math.max(0, roomW);
     
     if (roomW > 0 && roomH > 0) {
       rooms.push(createRoom(b.name, 'inner', rx, ry, roomW, roomH, b.color));
     }
-    const offsetY = (roomH - b.h) / 2;
-    b.itemsFn(rx, ry + offsetY);
+    
+    b.itemsFn(rx, ry);
+    
     if (roomW > 45 && roomH > 0) {
-      if (layoutShape === 'n-shape' || layoutShape === 'u-shape') {
-        equipments.push(createEq('Door', rx + roomW, ry + roomH / 2, -90, undefined, 45, 45));
-      } else {
-        equipments.push(createEq('Door', rx + roomW / 2, ry, 180, undefined, 45, 45));
-      }
+      // Bottom 블록의 문은 항상 위쪽 로비를 향함
+      equipments.push(createEq('Door', rx + roomW / 2, ry, 180, undefined, 45, 45));
     }
     currentX += b.w;
   }
@@ -416,52 +386,39 @@ export function generateAILayout(params: AILayoutParams): { rooms: RoomData[], e
     const rx = startX;
     const ry = currentY;
     
-    let maxStretchW = maxLeftW;
-    if (layoutShape === 'u-shape' || layoutShape === 'n-shape') {
-      maxStretchW = Math.max(b.w, finalOuterW - 50);
-    }
-    
-    const roomW = Math.max(0, Math.min(maxStretchW, outerMaxX - rx));
-    const roomH = Math.max(0, Math.min(b.h, outerMaxY - ry - (layoutShape === 'n-shape' ? maxBotH : maxBotH)));
-    // u-shape and n-shape both have maxBotH at bottom.
+    const roomW = Math.max(0, Math.min(b.w, outerMaxX - rx));
+    const roomH = Math.max(0, Math.min(b.h, outerMaxY - ry - (layoutShape === 'n-shape' || layoutShape === 'u-shape' ? maxBotH : 0)));
     
     if (roomW > 0 && roomH > 0) {
       rooms.push(createRoom(b.name, 'inner', rx, ry, roomW, roomH, b.color));
     }
-    const offsetX = (roomW - b.w) / 2;
-    b.itemsFn(rx + offsetX, ry);
+    
+    b.itemsFn(rx, ry);
+    
     if (roomW > 0 && roomH > 45) {
+      // Left 블록의 문은 항상 우측 로비를 향함
       equipments.push(createEq('Door', rx + roomW, ry + roomH / 2, -90, undefined, 45, 45));
     }
     currentY += b.h;
   }
 
   // Right Blocks
-  currentY = startY; // L-shape starts at top-right
+  currentY = startY; 
   for (const b of rightBlocks) {
-    let maxStretchW = maxRightW; // L-shape does not stretch left!
-    
-    const roomW = Math.max(0, maxStretchW);
+    const roomW = Math.max(0, Math.min(b.w, outerMaxX - startX));
     const rx = outerMaxX - roomW;
     const ry = currentY;
-    
-    let maxStretchH = b.h;
-    if (layoutShape === 'l-shape') {
-      maxStretchH = Math.max(b.h, finalOuterH - 50);
-    }
-    const roomH = Math.max(0, Math.min(maxStretchH, outerMaxY - ry));
+    const roomH = Math.max(0, Math.min(b.h, outerMaxY - ry));
     
     if (roomW > 0 && roomH > 0) {
       rooms.push(createRoom(b.name, 'inner', rx, ry, roomW, roomH, b.color));
     }
-    const offsetX = (roomW - b.w) / 2;
-    b.itemsFn(rx + offsetX, ry);
+    
+    b.itemsFn(rx, ry);
+    
     if (roomW > 0 && roomH > 45) {
-      if (layoutShape === 'l-shape') {
-        equipments.push(createEq('Door', rx + roomW / 2, ry + roomH, 0, undefined, 45, 45));
-      } else {
-        equipments.push(createEq('Door', rx, ry + roomH / 2, 90, undefined, 45, 45));
-      }
+      // Right 블록의 문은 항상 좌측 로비를 향함
+      equipments.push(createEq('Door', rx, ry + roomH / 2, 90, undefined, 45, 45));
     }
     currentY += b.h;
   }
