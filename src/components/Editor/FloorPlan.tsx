@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Line, Circle, Group, Text, Arrow } from 'react-konva';
 import { KonvaEventObject } from 'konva/lib/Node';
 import { RoomData, Point } from '@/app/page';
 
 interface FloorPlanProps {
   room: RoomData;
+  allRooms?: RoomData[];
   hasInnerRooms?: boolean;
   onChange: (newPoints: Point[]) => void;
   scale: number;
@@ -12,6 +13,9 @@ interface FloorPlanProps {
   onDragStart?: () => void;
   onDragMove?: (dx: number, dy: number) => void;
   onDragEnd?: (dx: number, dy: number) => void;
+  isMovingRoom?: boolean;
+  onSelect?: () => void;
+  isSelected?: boolean;
 }
 
 const getSnapSize = (scale: number) => {
@@ -26,26 +30,36 @@ const snapToGrid = (val: number, scale: number) => {
   return Math.round(val / snapSize) * snapSize;
 };
 
+const getClosestPointOnSegment = (p: {x:number, y:number}, v: {x:number, y:number}, w: {x:number, y:number}) => {
+  const l2 = Math.pow(v.x - w.x, 2) + Math.pow(v.y - w.y, 2);
+  if (l2 === 0) return { x: v.x, y: v.y, dist: Math.hypot(p.x - v.x, p.y - v.y) };
+  let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+  t = Math.max(0, Math.min(1, t));
+  const proj = { x: v.x + t * (w.x - v.x), y: v.y + t * (w.y - v.y) };
+  return { ...proj, dist: Math.hypot(p.x - proj.x, p.y - proj.y) };
+};
 
-
-function FloorPlan({ room, hasInnerRooms = false, onChange, scale, readOnly = false, onDragStart, onDragMove, onDragEnd }: FloorPlanProps) {
+function FloorPlan({ room, allRooms = [], hasInnerRooms = false, onChange, scale, readOnly = false, onDragStart, onDragMove, onDragEnd, isMovingRoom = false, onSelect, isSelected = false }: FloorPlanProps) {
   const points = room.points;
   const isOuter = room.type === 'outer';
   const colorTheme = room.colorTheme;
   const fillColor = isOuter ? 'rgba(59, 130, 246, 0.1)' : `${colorTheme}33`; // 20% opacity hex
   const strokeColor = colorTheme;
 
+  const [localPoints, setLocalPoints] = useState(points);
+  useEffect(() => setLocalPoints(points), [points]);
+
   const [hoveredPoint, setHoveredPoint] = useState<number | null>(null);
 
   // Convert array of objects to flat array [x1, y1, x2, y2, ...] required by Konva Line
-  const flatPoints = points.reduce((acc, point) => {
+  const flatPoints = localPoints.reduce((acc, point) => {
     acc.push(point.x, point.y);
     return acc;
   }, [] as number[]);
 
   // Calculate midpoints for the ghost markers
-  const midpoints = points.map((p1, i) => {
-    const p2 = points[(i + 1) % points.length];
+  const midpoints = localPoints.map((p1, i) => {
+    const p2 = localPoints[(i + 1) % localPoints.length];
     return {
       x: (p1.x + p2.x) / 2,
       y: (p1.y + p2.y) / 2,
@@ -54,18 +68,84 @@ function FloorPlan({ room, hasInnerRooms = false, onChange, scale, readOnly = fa
   });
 
   const handleDragMove = (index: number, e: KonvaEventObject<DragEvent>) => {
-    const newPoints = [...points];
-    newPoints[index] = {
-      x: e.target.x(),
-      y: e.target.y(),
-    };
-    onChange(newPoints);
+    const newPoints = [...localPoints];
+    let newX = e.target.x();
+    let newY = e.target.y();
+
+    // Smart Snapping to adjacent vertices to form right angles
+    const SNAP_THRESHOLD = 15 / scale;
+    // 1. Check snapping to other rooms' vertices (Point-to-Point)
+    let closestVertexDist = Infinity;
+    let snappedVertex: { x: number, y: number } | null = null;
+    
+    // 2. Check snapping to other rooms' walls (Point-to-Line)
+    let closestWallDist = Infinity;
+    let snappedWallPoint: { x: number, y: number } | null = null;
+
+    for (const otherRoom of allRooms) {
+      if (otherRoom.id === room.id) continue;
+      for (let i = 0; i < otherRoom.points.length; i++) {
+        const p1 = otherRoom.points[i];
+        
+        // Vertex snap check
+        const dist = Math.hypot(newX - p1.x, newY - p1.y);
+        if (dist < closestVertexDist && dist < SNAP_THRESHOLD) {
+          closestVertexDist = dist;
+          snappedVertex = { x: p1.x, y: p1.y };
+        }
+
+        // Wall snap check
+        const p2 = otherRoom.points[(i + 1) % otherRoom.points.length];
+        const closest = getClosestPointOnSegment({ x: newX, y: newY }, p1, p2);
+        if (closest.dist < closestWallDist && closest.dist < SNAP_THRESHOLD) {
+          closestWallDist = closest.dist;
+          snappedWallPoint = { x: closest.x, y: closest.y };
+        }
+      }
+    }
+
+    if (snappedVertex) {
+      // 1st priority: other room vertex
+      newX = snappedVertex.x;
+      newY = snappedVertex.y;
+    } else if (snappedWallPoint) {
+      // 2nd priority: other room wall
+      newX = snappedWallPoint.x;
+      newY = snappedWallPoint.y;
+    } else {
+      // 3rd priority: orthogonal snap to own adjacent vertices
+      const len = localPoints.length;
+      const prev = localPoints[(index - 1 + len) % len];
+      const next = localPoints[(index + 1) % len];
+
+      if (Math.abs(newX - prev.x) < SNAP_THRESHOLD) newX = prev.x;
+      else if (Math.abs(newX - next.x) < SNAP_THRESHOLD) newX = next.x;
+
+      if (Math.abs(newY - prev.y) < SNAP_THRESHOLD) newY = prev.y;
+      else if (Math.abs(newY - next.y) < SNAP_THRESHOLD) newY = next.y;
+    }
+
+    // Apply the snapped coordinates back to the visual target so it locks in place
+    e.target.position({ x: newX, y: newY });
+
+    newPoints[index] = { x: newX, y: newY };
+    setLocalPoints(newPoints);
   };
 
   return (
     <Group 
       id={`room-${room.id}`}
-      draggable={!isOuter}
+      draggable={!isOuter && isMovingRoom}
+      onClick={(e) => {
+        if (e.target.name() !== 'vertex' && e.target.name() !== 'midpoint') {
+          onSelect && onSelect();
+        }
+      }}
+      onTap={(e) => {
+        if (e.target.name() !== 'vertex' && e.target.name() !== 'midpoint') {
+          onSelect && onSelect();
+        }
+      }}
       onDragStart={(e) => {
         if (e.target !== e.currentTarget) return;
         // e.target.setAttr('startX', e.target.x()); // Save start pos if needed
@@ -103,13 +183,20 @@ function FloorPlan({ room, hasInnerRooms = false, onChange, scale, readOnly = fa
       }}
     >
       {/* The main polygon shape */}
-      <Line
-        points={flatPoints}
-        closed
-        fill={fillColor}
-        stroke={strokeColor}
-        strokeWidth={4 / scale} // Thicker border to make it easier to click
-        lineJoin="round"
+      {(() => {
+        const showHighlight = isSelected && !isOuter && !room.isLocked;
+        return (
+          <Line
+            points={flatPoints}
+            closed
+            fill={showHighlight ? `${colorTheme}66` : fillColor}
+            stroke={showHighlight ? '#2563eb' : strokeColor}
+            strokeWidth={(showHighlight ? 8 : 4) / scale}
+            shadowColor={showHighlight ? '#2563eb' : undefined}
+            shadowBlur={showHighlight ? 20 : 0}
+            shadowOpacity={0.8}
+            dash={isMovingRoom ? [15 / scale, 10 / scale] : undefined}
+            lineJoin="round"
         perfectDrawEnabled={false}
         onMouseEnter={(e) => {
           const container = e.target.getStage()?.container();
@@ -120,19 +207,27 @@ function FloorPlan({ room, hasInnerRooms = false, onChange, scale, readOnly = fa
           if (container && !isOuter) container.style.cursor = 'grab';
         }}
       />
+        );
+      })()}
 
       {/* Draggable Vertex Points */}
-      {points.map((point, index) => (
+      {!readOnly && !room.isLocked && localPoints.map((point, index) => (
         <Circle
           key={`vertex-${index}`}
+          name="vertex"
           x={point.x}
           y={point.y}
           radius={hoveredPoint === index ? 8 / scale : 6 / scale}
           fill="#ffffff"
           stroke={strokeColor}
           strokeWidth={2 / scale}
-          draggable={!readOnly}
+          draggable={!readOnly && !room.isLocked}
           onDragMove={(e) => handleDragMove(index, e)}
+          onDragEnd={(e) => {
+            const newPoints = [...localPoints];
+            newPoints[index] = { x: e.target.x(), y: e.target.y() };
+            onChange(newPoints);
+          }}
           onMouseEnter={() => {
             if (readOnly) return;
             setHoveredPoint(index);
@@ -160,21 +255,24 @@ function FloorPlan({ room, hasInnerRooms = false, onChange, scale, readOnly = fa
       ))}
 
       {/* Midpoint Ghost Markers */}
-      {midpoints.map((mp, index) => (
+      {!readOnly && !room.isLocked && midpoints.map((mp, index) => (
         <Circle
           key={`midpoint-${index}`}
+          name="midpoint"
           x={mp.x}
           y={mp.y}
           radius={5 / scale}
           fill={strokeColor}
           opacity={0.4}
           onClick={() => {
-            const newPoints = [...points];
+            if (readOnly || room.isLocked) return;
+            const newPoints = [...localPoints];
             newPoints.splice(mp.insertIdx, 0, { x: snapToGrid(mp.x, scale), y: snapToGrid(mp.y, scale) });
             onChange(newPoints);
           }}
           onTap={() => {
-            const newPoints = [...points];
+            if (readOnly || room.isLocked) return;
+            const newPoints = [...localPoints];
             newPoints.splice(mp.insertIdx, 0, { x: snapToGrid(mp.x, scale), y: snapToGrid(mp.y, scale) });
             onChange(newPoints);
           }}
@@ -194,8 +292,8 @@ function FloorPlan({ room, hasInnerRooms = false, onChange, scale, readOnly = fa
       ))}
 
       {/* CAD-Style Dimension Lines */}
-      {points.map((p1, i) => {
-        const p2 = points[(i + 1) % points.length];
+      {isOuter && localPoints.map((p1, i) => {
+        const p2 = localPoints[(i + 1) % localPoints.length];
         const dx = p2.x - p1.x;
         const dy = p2.y - p1.y;
         const L = Math.hypot(dx, dy);
@@ -231,6 +329,41 @@ function FloorPlan({ room, hasInnerRooms = false, onChange, scale, readOnly = fa
         if (angle > 90 || angle <= -90) {
           angle += 180;
         }
+
+        // Deduplication logic: check if any other room has an identical segment (forward or reverse)
+        // If so, only the outer room, or the room with the lexicographically smaller ID draws it.
+        const EPSILON = 1;
+        let shouldDrawDimension = true;
+        
+        for (const other of allRooms) {
+          if (other.id === room.id) continue;
+          
+          let hasOverlap = false;
+          const op = other.points;
+          for (let j = 0; j < op.length; j++) {
+            const q1 = op[j];
+            const q2 = op[(j + 1) % op.length];
+            
+            const matchForward = Math.hypot(p1.x - q1.x, p1.y - q1.y) < EPSILON && Math.hypot(p2.x - q2.x, p2.y - q2.y) < EPSILON;
+            const matchReverse = Math.hypot(p1.x - q2.x, p1.y - q2.y) < EPSILON && Math.hypot(p2.x - q1.x, p2.y - q1.y) < EPSILON;
+            
+            if (matchForward || matchReverse) {
+              hasOverlap = true;
+              break;
+            }
+          }
+          
+          if (hasOverlap) {
+            // Hide inner room's dimension if it overlaps with any other room's wall.
+            // The length can be inferred from the opposite non-shared wall, reducing visual clutter.
+            if (!isOuter) {
+              shouldDrawDimension = false;
+              break;
+            }
+          }
+        }
+
+        if (!shouldDrawDimension) return null;
 
         return (
           <Group key={`dim-${i}`} listening={false}>

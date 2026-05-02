@@ -148,7 +148,7 @@ export async function POST(req: Request) {
       }
 
       const mailOptions = {
-        from: `"필라테스 스페이스 관리자" <${process.env.EMAIL_USER}>`,
+        from: `"PILA-SPACE 관리자" <${process.env.EMAIL_USER}>`,
         to: email, // 개별 수신자
         subject: subject,
         html: htmlContent,

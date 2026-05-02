@@ -1,7 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import Editor from '@/components/Editor';
-import { EditorCanvasHandle } from '@/components/Editor/EditorCanvas';
+import Editor, { EditorCanvasHandle, calculateRoomAreaInfo } from '@/components/Editor/EditorCanvas';
 import { EquipmentData, EquipmentType, EQUIPMENT_DIMS } from '@/components/Editor/Equipment';
 import { generateAILayout } from '@/lib/layoutGenerator';
 import { useSession, signIn } from 'next-auth/react';
@@ -15,6 +14,7 @@ export interface RoomData {
   type: 'outer' | 'inner';
   points: Point[];
   colorTheme: string; // hex color code
+  isLocked?: boolean;
 }
 
 interface AppState {
@@ -42,11 +42,17 @@ export default function Home() {
   ]);
   const [equipments, setEquipments] = useState<EquipmentData[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [movingRoomId, setMovingRoomId] = useState<string | null>(null);
 
   // History state for Undo/Redo
-  const [history, setHistory] = useState<AppState[]>([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [historyState, setHistoryState] = useState<{ list: AppState[], index: number }>({ list: [], index: -1 });
   const [isLoaded, setIsLoaded] = useState(false);
+
+  const commitRef = useRef<NodeJS.Timeout | null>(null);
+  const latestStateRef = useRef<{ rooms: RoomData[], equipments: EquipmentData[] }>({ rooms, equipments });
+  
+  // Sync ref with current state so the batched commit always uses the absolute latest
+  latestStateRef.current = { rooms, equipments };
 
   // Quote Request Modal State
   const [showQuoteModal, setShowQuoteModal] = useState(false);
@@ -74,6 +80,9 @@ export default function Home() {
     groupRooms: { reformer: boolean; chair: boolean; barrel: boolean };
     privateRoomsCount: number | '';
     auxiliary: { reception: boolean; consultation: boolean; locker: boolean; lounge: boolean };
+    clearanceX: number | '';
+    clearanceY: number | '';
+    layoutShape: 'auto' | 'parallel' | 'l-shape' | 'u-shape';
   }>({
     mode: 'pyeong',
     pyeong: 30,
@@ -82,7 +91,10 @@ export default function Home() {
     groupCount: 6,
     groupRooms: { reformer: true, chair: false, barrel: false },
     privateRoomsCount: 1,
-    auxiliary: { reception: true, consultation: true, locker: true, lounge: false }
+    auxiliary: { reception: true, consultation: true, locker: true, lounge: false },
+    clearanceX: 80,
+    clearanceY: 80,
+    layoutShape: 'auto'
   });
 
   const editorRef = useRef<EditorCanvasHandle>(null);
@@ -104,8 +116,7 @@ export default function Home() {
         console.error('Failed to parse saved floorplan', e);
       }
     }
-    setHistory([{ rooms: initRooms, equipments: initEquips }]);
-    setHistoryIndex(0);
+    setHistoryState({ list: [{ rooms: initRooms, equipments: initEquips }], index: 0 });
     setIsLoaded(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -129,32 +140,45 @@ export default function Home() {
     localStorage.setItem('pilates-floorplan-data', JSON.stringify({ rooms, equipments }));
   }, [rooms, equipments, isLoaded]);
 
-  const saveToHistory = useCallback((newState: AppState) => {
-    setHistory((prev) => {
-      const newHistory = prev.slice(0, historyIndex + 1);
-      newHistory.push(newState);
-      return newHistory;
-    });
-    setHistoryIndex((prev) => prev + 1);
-  }, [historyIndex]);
+  const scheduleHistoryCommit = useCallback((partial: Partial<AppState>) => {
+    // Merge the partial state into our mutable latest state tracking
+    const nextState = { ...latestStateRef.current, ...partial };
+    latestStateRef.current = nextState;
+
+    if (commitRef.current) clearTimeout(commitRef.current);
+    commitRef.current = setTimeout(() => {
+      setHistoryState((prev) => {
+        // If we are making a change while in the middle of history, discard the future
+        const newList = prev.list.slice(0, prev.index + 1);
+        newList.push(nextState);
+        return { list: newList, index: newList.length - 1 };
+      });
+    }, 100);
+  }, []);
 
   const undo = useCallback(() => {
-    if (historyIndex > 0) {
-      const prevState = history[historyIndex - 1];
-      setRooms(prevState.rooms);
-      setEquipments(prevState.equipments);
-      setHistoryIndex(historyIndex - 1);
-    }
-  }, [history, historyIndex]);
+    setHistoryState((prev) => {
+      if (prev.index > 0) {
+        const prevState = prev.list[prev.index - 1];
+        setRooms(prevState.rooms);
+        setEquipments(prevState.equipments);
+        return { ...prev, index: prev.index - 1 };
+      }
+      return prev;
+    });
+  }, []);
 
   const redo = useCallback(() => {
-    if (historyIndex < history.length - 1) {
-      const nextState = history[historyIndex + 1];
-      setRooms(nextState.rooms);
-      setEquipments(nextState.equipments);
-      setHistoryIndex(historyIndex + 1);
-    }
-  }, [history, historyIndex]);
+    setHistoryState((prev) => {
+      if (prev.index < prev.list.length - 1) {
+        const nextState = prev.list[prev.index + 1];
+        setRooms(nextState.rooms);
+        setEquipments(nextState.equipments);
+        return { ...prev, index: prev.index + 1 };
+      }
+      return prev;
+    });
+  }, []);
 
   // Keyboard shortcuts for Undo/Redo
   useEffect(() => {
@@ -176,7 +200,7 @@ export default function Home() {
   // Wrappers to update state and history
   const updateRooms = (newRooms: RoomData[]) => {
     setRooms(newRooms);
-    saveToHistory({ rooms: newRooms, equipments });
+    scheduleHistoryCommit({ rooms: newRooms });
   };
 
   const handleGenerateAI = () => {
@@ -200,36 +224,71 @@ export default function Home() {
       ];
       setRooms(newRooms);
       setEquipments([]);
-      saveToHistory({ rooms: newRooms, equipments: [] });
+      scheduleHistoryCommit({ rooms: newRooms, equipments: [] });
       setShowAIModal(false);
       alert('기본 캔버스가 준비되었습니다. 점을 드래그하거나 도구를 사용해 공간을 구성해 보세요!');
       return;
     }
 
-    const { rooms: newRooms, equipments: newEquips, error } = generateAILayout({
+    const baseParams = {
       ...aiParams,
       pyeong: Number(aiParams.pyeong) || 30,
       widthM: Number(aiParams.widthM) || 10,
       heightM: Number(aiParams.heightM) || 10,
       groupCount: Number(aiParams.groupCount) || 0,
-      privateRoomsCount: Number(aiParams.privateRoomsCount) || 0
-    });
-    if (error) {
-      alert(error);
+      privateRoomsCount: Number(aiParams.privateRoomsCount) || 0,
+      clearanceX: (Number(aiParams.clearanceX) || 80) / 2,
+      clearanceY: (Number(aiParams.clearanceY) || 80) / 2,
+      layoutShape: aiParams.layoutShape
+    };
+
+    const initialResult = generateAILayout(baseParams);
+    if (initialResult.error) {
+      alert(initialResult.error);
       return;
     }
+
+    let finalResult = initialResult;
+    let finalGroupCount = baseParams.groupCount;
+
+    // AI Auto Suggestion: If space is available, try to fit more group members
+    if (!initialResult.isOverflowing && baseParams.groupCount > 0) {
+      let maxFitCount = baseParams.groupCount;
+      // Test up to +6 members
+      for (let i = 1; i <= 6; i++) {
+        const testCount = baseParams.groupCount + i;
+        const testResult = generateAILayout({ ...baseParams, groupCount: testCount });
+        if (testResult.isOverflowing) {
+          break; // Stop if it overflows
+        }
+        maxFitCount = testCount;
+      }
+
+      if (maxFitCount > baseParams.groupCount) {
+        const confirmMsg = `💡 여유 공간이 충분합니다!\n\n현재 공간 크기 및 여유 공간 설정(Clearance) 기준으로, 그룹 레슨 인원을 [${maxFitCount}명]까지 늘려도 쾌적하게 배치가 가능합니다.\n피크 타임 수익 극대화를 위해 ${maxFitCount}인 기준으로 다시 설계할까요?`;
+        if (window.confirm(confirmMsg)) {
+          finalResult = generateAILayout({ ...baseParams, groupCount: maxFitCount });
+          finalGroupCount = maxFitCount;
+          setAiParams(prev => ({ ...prev, groupCount: maxFitCount }));
+        }
+      }
+    }
     
-    setRooms(newRooms);
-    setEquipments(newEquips);
-    saveToHistory({ rooms: newRooms, equipments: newEquips });
+    setRooms(finalResult.rooms);
+    setEquipments(finalResult.equipments);
+    scheduleHistoryCommit({ rooms: finalResult.rooms, equipments: finalResult.equipments });
     setShowAIModal(false);
     
-    alert('AI 기반 자동 도면 생성이 완료되었습니다! 기구와 방의 위치를 자유롭게 드래그하여 수정해 보세요.');
+    if (finalResult.isOverflowing) {
+      alert('⚠️ 공간 부족 알림\n\n설정하신 면적에 비해 요청하신 기구 대수가 많아 일부 기구 및 룸이 외벽 밖으로 초과 배치되었습니다.\n쾌적한 동선을 위해 평수를 넓히시거나 기구 수를 줄여보시길 권장합니다.');
+    } else if (finalGroupCount === baseParams.groupCount) {
+      alert('AI 기반 자동 도면 생성이 완료되었습니다! 기구와 방의 위치를 자유롭게 드래그하여 수정해 보세요.');
+    }
   };
 
   const updateEquipments = (newEquipments: EquipmentData[]) => {
     setEquipments(newEquipments);
-    saveToHistory({ rooms, equipments: newEquipments });
+    scheduleHistoryCommit({ equipments: newEquipments });
   };
 
   const addRoom = () => {
@@ -324,6 +383,36 @@ export default function Home() {
     updateEquipments(newEquipments);
   };
 
+  const toggleLockRoom = (id: string) => {
+    const targetRoom = rooms.find(r => r.id === id);
+    const isCurrentlyLocked = targetRoom?.isLocked;
+    
+    const newRooms = rooms.map(room => 
+      room.id === id ? { ...room, isLocked: !room.isLocked } : room
+    );
+    updateRooms(newRooms);
+    
+    if (isCurrentlyLocked) {
+      setSelectedId(null);
+    }
+  };
+
+  const removeRoom = (id: string) => {
+    const newRooms = rooms.filter(room => room.id !== id);
+    updateRooms(newRooms);
+    if (selectedId === id) {
+      setSelectedId(null);
+      setMovingRoomId(null);
+    }
+  };
+
+  const toggleMovingRoom = (id: string) => {
+    setMovingRoomId(prev => prev === id ? null : id);
+  };
+
+
+  const selectedRoom = rooms.find(r => r.id === selectedId);
+
   const rotateEquipment = () => {
     if (!selectedId) return;
     const newEquipments = equipments.map(eq => 
@@ -380,20 +469,52 @@ export default function Home() {
     setCopyQuantity(1);
   };
 
+  // --- ROI Data Calculations ---
+  const outerRoom = rooms.find(r => r.type === 'outer');
+  let totalArea = 0;
+  let revenueArea = 0;
+  
+  if (outerRoom) {
+    totalArea = calculateRoomAreaInfo(outerRoom.points).areaPyeong;
+  }
+  
+  // Calculate revenue area from internal rooms that are not auxiliary/corridor
+  rooms.forEach(r => {
+    if (r.type === 'inner' && !['복도', '인포데스크', '상담실', '탈의실', '휴게실', '제한 면적'].some(nonRev => r.name.includes(nonRev))) {
+      revenueArea += calculateRoomAreaInfo(r.points).areaPyeong;
+    }
+  });
+
+  const revenueRatio = totalArea > 0 ? Math.min(100, Math.round((revenueArea / totalArea) * 100)) : 0;
+
+  // Max Revenue Calculation
+  // 1:1 개인 레슨 방 카운트
+  const privateRoomCount = rooms.filter(r => r.name.includes('개인')).length;
+  // 전체 배치된 그룹 기구 카운트 (커스텀/출입문/캐딜락 제외)
+  const groupEqCount = equipments.filter(e => !['Custom', 'Door', 'Cadillac'].includes(e.type)).length;
+  // 개인룸 하나당 3개(리포머, 체어, 바렐)의 기구를 소진한다고 가정
+  const estimatedGroupCapacity = Math.max(0, groupEqCount - (privateRoomCount * 3));
+  
+  // 예상 월 최대 매출액 (개인 8만*5회*20일=800만, 그룹 2만*5회*20일=200만)
+  const maxRevenueMonthly = (privateRoomCount * 8000000) + (estimatedGroupCapacity * 2000000);
+
   return (
     <main className={styles.layout}>
       {/* Top Navigation Bar */}
       <header className={styles.header}>
-        <h1 className={styles.headerTitle}>
-          Pilates Space Optimizer
-        </h1>
+        <div className={styles.headerTitleContainer} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <img src="/logo.png" alt="PILA-SPACE Logo" style={{ height: '40px', width: '40px', objectFit: 'contain', borderRadius: '8px' }} />
+          <h1 className={styles.headerTitle} style={{ margin: 0 }}>
+            PILA-SPACE
+          </h1>
+        </div>
         <div style={{ flex: 1, display: 'flex', justifyContent: 'center', gap: '8px' }}>
           {/* Undo / Redo Buttons */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ display: 'flex', gap: '4px', background: '#f3f4f6', padding: '4px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
               <button 
                 onClick={undo}
-                disabled={historyIndex <= 0}
+                disabled={historyState.index <= 0}
                 title="실행 취소 (Ctrl+Z)"
                 style={{
                   display: 'flex',
@@ -401,13 +522,13 @@ export default function Home() {
                   gap: '6px',
                   padding: '6px 16px',
                   borderRadius: '6px',
-                  background: historyIndex <= 0 ? 'transparent' : 'white',
-                  border: historyIndex <= 0 ? '1px solid transparent' : '1px solid #d1d5db',
-                  color: historyIndex <= 0 ? '#9ca3af' : '#111827',
+                  background: historyState.index <= 0 ? 'transparent' : 'white',
+                  border: historyState.index <= 0 ? '1px solid transparent' : '1px solid #d1d5db',
+                  color: historyState.index <= 0 ? '#9ca3af' : '#111827',
                   fontWeight: 600,
                   fontSize: '14px',
-                  cursor: historyIndex <= 0 ? 'not-allowed' : 'pointer',
-                  boxShadow: historyIndex <= 0 ? 'none' : '0 1px 2px rgba(0,0,0,0.05)',
+                  cursor: historyState.index <= 0 ? 'not-allowed' : 'pointer',
+                  boxShadow: historyState.index <= 0 ? 'none' : '0 1px 2px rgba(0,0,0,0.05)',
                   transition: 'all 0.2s'
                 }}
               >
@@ -418,7 +539,7 @@ export default function Home() {
               
               <button 
                 onClick={redo}
-                disabled={historyIndex >= history.length - 1}
+                disabled={historyState.index >= historyState.list.length - 1}
                 title="다시 실행 (Ctrl+Y)"
                 style={{
                   display: 'flex',
@@ -426,13 +547,13 @@ export default function Home() {
                   gap: '6px',
                   padding: '6px 16px',
                   borderRadius: '6px',
-                  background: historyIndex >= history.length - 1 ? 'transparent' : 'white',
-                  border: historyIndex >= history.length - 1 ? '1px solid transparent' : '1px solid #d1d5db',
-                  color: historyIndex >= history.length - 1 ? '#9ca3af' : '#111827',
+                  background: historyState.index >= historyState.list.length - 1 ? 'transparent' : 'white',
+                  border: historyState.index >= historyState.list.length - 1 ? '1px solid transparent' : '1px solid #d1d5db',
+                  color: historyState.index >= historyState.list.length - 1 ? '#9ca3af' : '#111827',
                   fontWeight: 600,
                   fontSize: '14px',
-                  cursor: historyIndex >= history.length - 1 ? 'not-allowed' : 'pointer',
-                  boxShadow: historyIndex >= history.length - 1 ? 'none' : '0 1px 2px rgba(0,0,0,0.05)',
+                  cursor: historyState.index >= historyState.list.length - 1 ? 'not-allowed' : 'pointer',
+                  boxShadow: historyState.index >= historyState.list.length - 1 ? 'none' : '0 1px 2px rgba(0,0,0,0.05)',
                   transition: 'all 0.2s'
                 }}
               >
@@ -515,7 +636,7 @@ export default function Home() {
         </button>
       )}
 
-      {/* Contextual Floating Pill Menu */}
+      {/* Equipment Contextual Floating Pill Menu */}
       {selectedEquipment && !isMobileMenuOpen && (
         <div className={styles.contextMenu}>
           {!selectedEquipment.isLocked && <button onClick={rotateEquipment}>🔄 회전</button>}
@@ -525,6 +646,18 @@ export default function Home() {
             {selectedEquipment.isLocked ? '🔓 해제' : '🔒 고정'}
           </button>
           {!selectedEquipment.isLocked && <button className={styles.deleteBtn} onClick={() => removeEquipment(selectedEquipment.id)}>🗑️ 삭제</button>}
+        </div>
+      )}
+
+      {/* Room Contextual Floating Pill Menu */}
+      {selectedRoom && !isMobileMenuOpen && (
+        <div className={styles.contextMenu}>
+          <button onClick={() => toggleLockRoom(selectedRoom.id)}>
+            {selectedRoom.isLocked ? '🔓 방 전체 잠금 해제' : '🔒 방 전체 잠금'}
+          </button>
+          {!selectedRoom.isLocked && selectedRoom.type !== 'outer' && (
+            <button className={styles.deleteBtn} onClick={() => removeRoom(selectedRoom.id)}>🗑️ 삭제</button>
+          )}
         </div>
       )}
 
@@ -597,6 +730,45 @@ export default function Home() {
       <div className={styles.editorArea}>
         {/* Toolbar (Left / Bottom Sheet on Mobile) */}
         <aside className={`${styles.toolbar} ${isMobileMenuOpen ? styles.toolbarOpen : ''}`}>
+          
+          {/* ROI Dashboard */}
+          <div style={{ marginBottom: '24px', background: 'linear-gradient(to bottom right, #f8fafc, #eff6ff)', padding: '16px', borderRadius: '12px', border: '1px solid #bfdbfe', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
+            <h2 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#1e3a8a', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              📊 실시간 공간 ROI 분석
+            </h2>
+            
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '8px' }}>
+                <span style={{ fontSize: '12px', color: '#475569', fontWeight: 600 }}>매출 공간 (레슨룸) 비율</span>
+                <span style={{ fontSize: '14px', fontWeight: 800, color: revenueRatio >= 70 ? '#059669' : revenueRatio >= 50 ? '#d97706' : '#dc2626' }}>
+                  {revenueRatio}%
+                </span>
+              </div>
+              <div style={{ width: '100%', height: '8px', background: '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+                <div style={{ 
+                  height: '100%', 
+                  width: `${revenueRatio}%`, 
+                  background: revenueRatio >= 70 ? '#10b981' : revenueRatio >= 50 ? '#f59e0b' : '#ef4444',
+                  transition: 'width 0.3s ease, background 0.3s ease'
+                }} />
+              </div>
+              <p style={{ fontSize: '11px', color: '#64748b', marginTop: '6px', lineHeight: 1.3 }}>
+                {revenueRatio >= 70 ? '✨ 훌륭합니다! 상업 공간 황금비율을 달성했습니다.' : revenueRatio >= 50 ? '⚠️ 비수익 공간(복도/부대시설)이 다소 많습니다.' : '🚨 데드스페이스가 많습니다. 재배치를 권장합니다.'}
+              </p>
+            </div>
+
+            <div style={{ background: 'white', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+              <span style={{ fontSize: '11px', color: '#64748b', display: 'block', marginBottom: '4px' }}>예상 월 최대 매출 (풀타임 가동시)</span>
+              <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>
+                ₩{maxRevenueMonthly.toLocaleString()}
+              </div>
+              <p style={{ fontSize: '10px', color: '#94a3b8', margin: '4px 0 0 0', lineHeight: 1.3 }}>
+                * 개인룸 {privateRoomCount}개, 그룹기구 {estimatedGroupCapacity}대 기준<br/>
+                (업계 평균 객단가 및 주 5일 5타임 추정치)
+              </p>
+            </div>
+          </div>
+
           <div className={styles.toolSection}>
             <h2 style={{ fontSize: '0.875rem', fontWeight: 600, color: '#6b7280', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               도구 (Tools)
@@ -748,6 +920,7 @@ export default function Home() {
           setRooms={updateRooms}
           selectedId={selectedId}
           setSelectedId={setSelectedId}
+          movingRoomId={movingRoomId}
         />
       </div>
 
@@ -881,6 +1054,41 @@ export default function Home() {
                   </div>
                 )}
 
+                <div style={{ marginBottom: '16px', padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', color: '#1e293b', marginBottom: '8px', fontWeight: 700 }}>1.5 공간 분할 형태 (Layout Shape)</label>
+                  <p style={{ fontSize: '11px', color: '#64748b', margin: '0 0 12px 0', lineHeight: 1.4 }}>
+                    전체 공간의 외곽을 따라 기구 방들을 어떻게 배치할지 결정합니다. 가운데 빈 공간은 복도로 자동 할당됩니다.
+                  </p>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    {[
+                      { id: 'auto', label: '자동 (Auto)' },
+                      { id: 'parallel', label: '11자형' },
+                      { id: 'l-shape', label: 'ㄱ자형' },
+                      { id: 'n-shape', label: 'ㄴ자형' },
+                      { id: 'u-shape', label: 'ㄷ자형' }
+                    ].map(shape => (
+                      <button
+                        key={shape.id}
+                        onClick={() => setAiParams({...aiParams, layoutShape: shape.id as any})}
+                        style={{
+                          flex: 1,
+                          padding: '8px 4px',
+                          background: aiParams.layoutShape === shape.id ? '#3b82f6' : 'white',
+                          color: aiParams.layoutShape === shape.id ? 'white' : '#475569',
+                          border: `1px solid ${aiParams.layoutShape === shape.id ? '#3b82f6' : '#cbd5e1'}`,
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          fontWeight: aiParams.layoutShape === shape.id ? 700 : 500,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        {shape.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div style={{ marginBottom: '16px', padding: '16px', background: '#f3f4f6', borderRadius: '8px' }}>
                   <label style={{ display: 'block', fontSize: '13px', color: '#111827', marginBottom: '8px', fontWeight: 700 }}>1. 그룹 레슨룸 구성</label>
                   <div style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -943,6 +1151,31 @@ export default function Home() {
                       <input type="checkbox" checked={aiParams.auxiliary.lounge} onChange={e => setAiParams({...aiParams, auxiliary: {...aiParams.auxiliary, lounge: e.target.checked}})} />
                       휴게실/라운지
                     </label>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '16px', padding: '16px', background: '#f3f4f6', borderRadius: '8px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', color: '#111827', marginBottom: '8px', fontWeight: 700 }}>4. 기구 여유 공간 설정 (Clearance)</label>
+                  <p style={{ fontSize: '11px', color: '#6b7280', margin: '0 0 12px 0' }}>기구 사이의 간격을 조절하여 쾌적도를 설정합니다. (기본 80cm)</p>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ display: 'block', fontSize: '12px', color: '#4b5563', marginBottom: '4px' }}>좌/우 공간 (cm)</label>
+                      <input 
+                        type="number" 
+                        value={aiParams.clearanceX} 
+                        onChange={e => setAiParams({...aiParams, clearanceX: e.target.value === '' ? '' : parseInt(e.target.value)})} 
+                        style={{ width: '100%', padding: '8px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box' }} 
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ display: 'block', fontSize: '12px', color: '#4b5563', marginBottom: '4px' }}>상/하 공간 (cm)</label>
+                      <input 
+                        type="number" 
+                        value={aiParams.clearanceY} 
+                        onChange={e => setAiParams({...aiParams, clearanceY: e.target.value === '' ? '' : parseInt(e.target.value)})} 
+                        style={{ width: '100%', padding: '8px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box' }} 
+                      />
+                    </div>
                   </div>
                 </div>
               </>

@@ -1,6 +1,6 @@
 'use client';
-import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
-import { Stage, Layer, Label, Tag, Text as KonvaText } from 'react-konva';
+import React, { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { Stage, Layer, Label, Tag, Text as KonvaText, Group, Circle } from 'react-konva';
 import Konva from 'konva';
 import Grid from './Grid';
 import FloorPlan from './FloorPlan';
@@ -19,11 +19,21 @@ function isPointInPolygon(point: Point, vs: Point[]) {
   return inside;
 }
 
+export const getClosestPointOnSegment = (p: Point, v: Point, w: Point) => {
+  const l2 = Math.pow(v.x - w.x, 2) + Math.pow(v.y - w.y, 2);
+  if (l2 === 0) return { x: v.x, y: v.y, dist: Math.hypot(p.x - v.x, p.y - v.y) };
+  let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+  t = Math.max(0, Math.min(1, t));
+  const proj = { x: v.x + t * (w.x - v.x), y: v.y + t * (w.y - v.y) };
+  return { ...proj, dist: Math.hypot(p.x - proj.x, p.y - proj.y) };
+};
+
 export const calculateRoomAreaInfo = (points: Point[]) => {
   let area = 0;
-  const j = points.length - 1;
+  let j = points.length - 1;
   for (let i = 0; i < points.length; i++) {
     area += (points[j].x + points[i].x) * (points[j].y - points[i].y);
+    j = i;
   }
   const areaPx = Math.abs(area / 2);
   const areaSqm = areaPx / (50 * 50);
@@ -40,13 +50,14 @@ interface EditorCanvasProps {
   setSelectedId: (id: string | null) => void;
   editorRef?: React.RefObject<EditorCanvasHandle | null>;
   readOnly?: boolean;
+  movingRoomId?: string | null;
 }
 
 export interface EditorCanvasHandle {
   downloadImage: (fileName?: string) => void;
 }
 
-export default function EditorCanvas({ equipments, setEquipments, rooms, setRooms, selectedId, setSelectedId, editorRef, readOnly = false }: EditorCanvasProps) {
+export default function EditorCanvas({ equipments, setEquipments, rooms, setRooms, selectedId, setSelectedId, editorRef, readOnly = false, movingRoomId = null }: EditorCanvasProps) {
   const stageRef = useRef<Konva.Stage>(null);
   const mainLayerRef = useRef<Konva.Layer>(null);
   
@@ -115,7 +126,7 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
         const minX = Math.min(...initialRoomPointsRef.current.map((p) => p.x));
         const minY = Math.min(...initialRoomPointsRef.current.map((p) => p.y));
         const isOuter = room.type === 'outer';
-        badgeNode.position({ x: minX + (isOuter ? 20 : 10) + dx, y: minY + (isOuter ? 20 : 10) + dy });
+        badgeNode.position({ x: minX + (isOuter ? 0 : 10) + dx, y: minY + (isOuter ? -80 : 10) + dy });
         badgeNode.getLayer()?.batchDraw();
       }
     }
@@ -152,6 +163,7 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
 
     draggingEquipmentsRef.current = [];
     draggingRoomIndexRef.current = -1;
+    setSelectedId(null);
   };
 
   const checkDeselect = (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
@@ -400,6 +412,7 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
               <FloorPlan 
                 key={room.id}
                 room={room} 
+                allRooms={rooms}
                 hasInnerRooms={rooms.length > 1}
                 onChange={(newPoints) => {
                   const newRooms = [...rooms];
@@ -408,82 +421,212 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
                 }} 
                 scale={scale}
                 readOnly={readOnly}
+                isSelected={room.id === selectedId}
+                onSelect={() => {
+                  if (!readOnly) setSelectedId(room.id);
+                }}
                 onDragStart={() => handleRoomDragStart(room, index)}
                 onDragMove={(dx, dy) => handleRoomDragMove(dx, dy, 'room')}
                 onDragEnd={handleRoomDragEnd}
               />
             ))}
             {/* Equipment Layer */}
-            {equipments.map((eq, i) => (
-              <Equipment
-                key={eq.id}
-                data={readOnly ? { ...eq, isLocked: true } : eq}
-                isSelected={!readOnly && eq.id === selectedId}
-                onSelect={() => {
-                  if (!readOnly) setSelectedId(eq.id);
-                }}
-                onChange={(newAttrs) => {
-                  const eqs = equipments.slice();
-                  eqs[i] = newAttrs;
-                  setEquipments(eqs);
-                }}
-                scale={scale}
-              />
-            ))}
+            {equipments.map((eq, i) => {
+              const inLockedRoom = rooms.some(r => r.isLocked && isPointInPolygon({ x: eq.x, y: eq.y }, r.points));
+              const isEqLocked = readOnly || inLockedRoom || eq.isLocked;
+              return (
+                <Equipment
+                  key={eq.id}
+                  data={isEqLocked ? { ...eq, isLocked: true } : eq}
+                  isSelected={!readOnly && eq.id === selectedId}
+                  onSelect={() => {
+                    if (!readOnly) setSelectedId(eq.id);
+                  }}
+                  onChange={(newAttrs) => {
+                    const eqs = equipments.slice();
+                    eqs[i] = newAttrs;
+                    setEquipments(eqs);
+                  }}
+                  scale={scale}
+                  rooms={rooms}
+                  allEquipments={equipments}
+                />
+              );
+            })}
             {/* Room Labels & Move Handles (Always on top) */}
             {rooms.map((room, index) => {
               const { areaSqm, areaPyeong } = calculateRoomAreaInfo(room.points);
               const minX = Math.min(...room.points.map((p) => p.x));
               const minY = Math.min(...room.points.map((p) => p.y));
+              const maxX = Math.max(...room.points.map((p) => p.x));
+              const maxY = Math.max(...room.points.map((p) => p.y));
+              const centerX = (minX + maxX) / 2;
+              const centerY = (minY + maxY) / 2;
+              
               const isOuter = room.type === 'outer';
-              const textStr = isOuter 
+              let textStr = isOuter 
                 ? `${room.name} | ${areaPyeong.toFixed(1)}평 (${areaSqm.toFixed(1)}m²)` 
                 : `${room.name} • ${areaPyeong.toFixed(1)}평`;
 
+              let iconStr = '';
+              if (room.isLocked) iconStr = '🔒 ';
+
+              let tagFill = room.id === selectedId ? '#eff6ff' : 'rgba(255,255,255,0.9)';
+              let tagStroke = room.id === selectedId ? '#3b82f6' : '#d1d5db';
+              let tagStrokeWidth = room.id === selectedId ? 2 : 1;
+
               return (
-                <Label
-                  key={`badge-${room.id}`}
-                  id={`badge-${room.id}`}
-                  x={minX + (isOuter ? 20 : 10)}
-                  y={minY + (isOuter ? 20 : 10)}
-                  draggable={!isOuter && !readOnly}
-                  onDragStart={(e) => {
-                    if (e.target !== e.currentTarget) return;
-                    handleRoomDragStart(room, index);
-                  }}
-                  onDragMove={(e) => {
-                    if (e.target !== e.currentTarget) return;
-                    const dx = e.target.x() - (minX + 10);
-                    const dy = e.target.y() - (minY + 10);
-                    // Native drag moves the badge, so we just move other things
-                    handleRoomDragMove(dx, dy, 'badge');
-                  }}
-                  onDragEnd={(e) => {
-                    if (e.target !== e.currentTarget) return;
-                    const dx = e.target.x() - (minX + 10);
-                    const dy = e.target.y() - (minY + 10);
-                    e.target.position({ x: minX + 10, y: minY + 10 }); // Reset native position
-                    handleRoomDragEnd(dx, dy);
-                  }}
-                  onMouseEnter={(e) => {
-                    const container = e.target.getStage()?.container();
-                    if (container && !isOuter && !readOnly) container.style.cursor = 'move';
-                  }}
-                  onMouseLeave={(e) => {
-                    const container = e.target.getStage()?.container();
-                    if (container && !isOuter && !readOnly) container.style.cursor = 'grab';
-                  }}
-                >
-                  <Tag fill="rgba(255,255,255,0.9)" stroke="#d1d5db" strokeWidth={1} cornerRadius={12} />
-                  <KonvaText
-                    text={isOuter ? textStr : `✥  ${textStr}`}
-                    fontSize={12}
-                    fontFamily="sans-serif"
-                    fontStyle="bold"
-                    fill="#374151"
-                    padding={6}
-                  />
-                </Label>
+                <React.Fragment key={`room-overlay-${room.id}`}>
+                  <Label
+                    id={`badge-${room.id}`}
+                    x={minX + (isOuter ? 0 : 10)}
+                    y={minY + (isOuter ? -80 : 10)}
+                    listening={!isOuter}
+                    onClick={() => {
+                      if (!readOnly) setSelectedId(room.id);
+                    }}
+                    onTap={() => {
+                      if (!readOnly) setSelectedId(room.id);
+                    }}
+                    onMouseEnter={(e) => {
+                      const container = e.target.getStage()?.container();
+                      if (container && !isOuter && !readOnly) {
+                        container.style.cursor = 'pointer';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      const container = e.target.getStage()?.container();
+                      if (container && !isOuter && !readOnly) {
+                        container.style.cursor = 'grab';
+                      }
+                    }}
+                  >
+                    <Tag 
+                      fill={tagFill} 
+                      stroke={tagStroke} 
+                      strokeWidth={tagStrokeWidth} 
+                      cornerRadius={12} 
+                    />
+                    <KonvaText
+                      text={`${iconStr}${textStr}`}
+                      fontSize={12}
+                      fontFamily="sans-serif"
+                      fontStyle="bold"
+                      fill="#374151"
+                      padding={6}
+                    />
+                  </Label>
+
+                  {/* Central Move Handle */}
+                  {room.id === selectedId && !isOuter && !readOnly && !room.isLocked && (
+                    <Group
+                      x={centerX}
+                      y={centerY}
+                      draggable
+                      onDragStart={(e) => {
+                        if (e.target !== e.currentTarget) return;
+                        handleRoomDragStart(room, index);
+                      }}
+                      onDragMove={(e) => {
+                        if (e.target !== e.currentTarget) return;
+                        let dx = e.target.x() - centerX;
+                        let dy = e.target.y() - centerY;
+
+                        const SNAP_DIST = 15 / scale;
+                        let snapDx = 0;
+                        let snapDy = 0;
+                        let foundSnap = false;
+
+                        for (const otherRoom of rooms) {
+                          if (otherRoom.id === room.id) continue;
+                          for (let i = 0; i < room.points.length && !foundSnap; i++) {
+                            const movingP = { x: room.points[i].x + dx, y: room.points[i].y + dy };
+                            
+                            // 1. Point to Point
+                            for (let j = 0; j < otherRoom.points.length; j++) {
+                               const op = otherRoom.points[j];
+                               if (Math.hypot(movingP.x - op.x, movingP.y - op.y) < SNAP_DIST) {
+                                  snapDx = op.x - movingP.x;
+                                  snapDy = op.y - movingP.y;
+                                  foundSnap = true;
+                                  break;
+                               }
+                            }
+                            if (foundSnap) break;
+                            
+                            // 2. Point to Line
+                            for (let j = 0; j < otherRoom.points.length; j++) {
+                               const op1 = otherRoom.points[j];
+                               const op2 = otherRoom.points[(j + 1) % otherRoom.points.length];
+                               const closest = getClosestPointOnSegment(movingP, op1, op2);
+                               if (closest.dist < SNAP_DIST) {
+                                  snapDx = closest.x - movingP.x;
+                                  snapDy = closest.y - movingP.y;
+                                  foundSnap = true;
+                                  break;
+                               }
+                            }
+                          }
+                          if (foundSnap) break;
+                        }
+
+                        if (foundSnap) {
+                          dx += snapDx;
+                          dy += snapDy;
+                          e.target.position({ x: centerX + dx, y: centerY + dy });
+                        }
+
+                        handleRoomDragMove(dx, dy, 'badge');
+                      }}
+                      onDragEnd={(e) => {
+                        if (e.target !== e.currentTarget) return;
+                        const dx = e.target.x() - centerX;
+                        const dy = e.target.y() - centerY;
+                        e.target.position({ x: centerX, y: centerY });
+                        handleRoomDragEnd(dx, dy);
+                      }}
+                      onMouseEnter={(e) => {
+                        const container = e.target.getStage()?.container();
+                        if (container) {
+                          container.style.cursor = 'move';
+                          // Add hover effect
+                          const group = e.currentTarget as Konva.Group;
+                          const circle = group.findOne('Circle');
+                          if (circle) circle.setAttr('scaleX', 1.1), circle.setAttr('scaleY', 1.1);
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        const container = e.target.getStage()?.container();
+                        if (container) {
+                          container.style.cursor = 'grab';
+                          const group = e.currentTarget as Konva.Group;
+                          const circle = group.findOne('Circle');
+                          if (circle) circle.setAttr('scaleX', 1), circle.setAttr('scaleY', 1);
+                        }
+                      }}
+                    >
+                      <Circle
+                        radius={24}
+                        fill="#ffffff"
+                        stroke="#3b82f6"
+                        strokeWidth={2}
+                        shadowColor="#3b82f6"
+                        shadowBlur={10}
+                        shadowOpacity={0.4}
+                      />
+                      <KonvaText
+                        text="✥"
+                        fontSize={24}
+                        fill="#3b82f6"
+                        x={-12}
+                        y={-12}
+                        fontStyle="bold"
+                        align="center"
+                        verticalAlign="middle"
+                      />
+                    </Group>
+                  )}
+                </React.Fragment>
               );
             })}
           </Layer>

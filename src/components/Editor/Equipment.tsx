@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { Group, Rect, Text, Transformer, Arc } from 'react-konva';
 import Konva from 'konva';
 import { KonvaEventObject } from 'konva/lib/Node';
+import { RoomData, Point } from '@/app/page';
 
 export type EquipmentType = 'Reformer' | 'Cadillac' | 'Chair' | 'Barrel' | 'Custom' | 'Door';
 
@@ -24,6 +25,8 @@ interface EquipmentProps {
   onSelect: () => void;
   onChange: (newAttrs: EquipmentData) => void;
   scale: number;
+  rooms?: RoomData[];
+  allEquipments?: EquipmentData[];
 }
 
 // 1m = 50px
@@ -47,7 +50,153 @@ const snapToGrid = (val: number, scale: number) => {
   return Math.round(val / snapSize) * snapSize;
 };
 
-function Equipment({ data, isSelected, onSelect, onChange, scale }: EquipmentProps) {
+const getClosestPointOnSegment = (p: {x:number, y:number}, v: {x:number, y:number}, w: {x:number, y:number}) => {
+  const l2 = Math.pow(v.x - w.x, 2) + Math.pow(v.y - w.y, 2);
+  if (l2 === 0) return { x: v.x, y: v.y, dist: Math.hypot(p.x - v.x, p.y - v.y) };
+  let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+  t = Math.max(0, Math.min(1, t));
+  const proj = { x: v.x + t * (w.x - v.x), y: v.y + t * (w.y - v.y) };
+  return { ...proj, dist: Math.hypot(p.x - proj.x, p.y - proj.y) };
+};
+
+const getEquipmentSnap = (
+  cx: number, cy: number, currentRot: number, 
+  dims: { width: number, height: number }, clearancePx: number, 
+  rooms: RoomData[], scale: number
+): { x: number, y: number, rotation: number, score: number } | null => {
+  const SNAP_DIST = 20 / scale;
+  const reqDist1 = dims.height / 2 + clearancePx; // Side edge
+  const reqDist2 = dims.width / 2 + clearancePx; // Front/back edge
+
+  let bestSnap: { x: number, y: number, rotation: number, score: number } | null = null;
+
+  rooms.forEach(room => {
+    for (let i = 0; i < room.points.length; i++) {
+      const p1 = room.points[i];
+      const p2 = room.points[(i + 1) % room.points.length];
+      
+      const vx = p2.x - p1.x;
+      const vy = p2.y - p1.y;
+      const L = Math.hypot(vx, vy);
+      if (L === 0) continue;
+
+      const ux = vx / L;
+      const uy = vy / L;
+      let nx = -uy;
+      let ny = ux;
+
+      const wx = cx - p1.x;
+      const wy = cy - p1.y;
+
+      const projU = wx * ux + wy * uy;
+      if (projU < 0 || projU > L) continue;
+
+      let dist = wx * nx + wy * ny;
+      if (dist < 0) {
+        dist = -dist;
+        nx = -nx;
+        ny = -ny;
+      }
+
+      const wallAngle = Math.atan2(vy, vx) * 180 / Math.PI;
+
+      const checkSnap = (reqDist: number, angleOffset: number) => {
+        if (Math.abs(dist - reqDist) < SNAP_DIST) {
+           const snapX = cx + nx * (reqDist - dist);
+           const snapY = cy + ny * (reqDist - dist);
+           
+           const finalRot = currentRot;
+           const score = Math.abs(dist - reqDist);
+           
+           if (!bestSnap || score < bestSnap.score) {
+             bestSnap = { x: snapX, y: snapY, rotation: finalRot, score };
+           }
+        }
+      };
+
+      checkSnap(reqDist1, 0); 
+      checkSnap(reqDist2, 90);
+    }
+  });
+
+  return bestSnap;
+};
+
+const getEqToEqSnap = (
+  myId: string, cx: number, cy: number, currentRot: number, 
+  myDims: { width: number, height: number }, myClearancePx: number, 
+  allEquipments: EquipmentData[], scale: number
+): { x: number, y: number, rotation: number, score: number } | null => {
+  const SNAP_DIST = 20 / scale;
+  const ALIGN_DIST = 40 / scale; // More forgiving for axis alignment
+  
+  let bestSnap: { x: number, y: number, rotation: number, score: number } | null = null;
+
+  allEquipments.forEach(other => {
+    if (other.id === myId) return;
+
+    // Default dimensions for other if not customized
+    const oDims = EQUIPMENT_DIMS[other.type];
+    const ow = other.width || oDims.width;
+    const oh = other.height || oDims.height;
+    const oClearancePx = (other.clearance ?? 40) / 2;
+
+    const ox = other.x;
+    const oy = other.y;
+    const oRot = other.rotation || 0;
+
+    // Transform my center to other's local space
+    const radInv = -oRot * Math.PI / 180;
+    const dx = (cx - ox) * Math.cos(radInv) - (cy - oy) * Math.sin(radInv);
+    const dy = (cx - ox) * Math.sin(radInv) + (cy - oy) * Math.cos(radInv);
+
+    const checkLocalSnap = (isPerpendicular: boolean) => {
+      const aw = isPerpendicular ? myDims.height : myDims.width;
+      const ah = isPerpendicular ? myDims.width : myDims.height;
+      
+      const reqXDist = (aw / 2 + myClearancePx) + (ow / 2 + oClearancePx);
+      const reqYDist = (ah / 2 + myClearancePx) + (oh / 2 + oClearancePx);
+
+      let snapDx = dx;
+      let snapDy = dy;
+      let didSnap = false;
+
+      // Check X-axis touch (aligning Y)
+      if (Math.abs(Math.abs(dx) - reqXDist) < SNAP_DIST && Math.abs(dy) < ALIGN_DIST) {
+        snapDx = dx > 0 ? reqXDist : -reqXDist;
+        snapDy = 0; // Align center
+        didSnap = true;
+      }
+      // Check Y-axis touch (aligning X)
+      else if (Math.abs(Math.abs(dy) - reqYDist) < SNAP_DIST && Math.abs(dx) < ALIGN_DIST) {
+        snapDy = dy > 0 ? reqYDist : -reqYDist;
+        snapDx = 0; // Align center
+        didSnap = true;
+      }
+
+      if (didSnap) {
+        // Convert back to global space
+        const rad = oRot * Math.PI / 180;
+        const snapX = ox + snapDx * Math.cos(rad) - snapDy * Math.sin(rad);
+        const snapY = oy + snapDx * Math.sin(rad) + snapDy * Math.cos(rad);
+
+        const finalRot = currentRot;
+        const score = Math.hypot(snapX - cx, snapY - cy);
+
+        if (!bestSnap || score < bestSnap.score) {
+          bestSnap = { x: snapX, y: snapY, rotation: finalRot, score };
+        }
+      }
+    };
+
+    checkLocalSnap(false); // parallel
+    checkLocalSnap(true); // perpendicular
+  });
+
+  return bestSnap;
+};
+
+function Equipment({ data, isSelected, onSelect, onChange, scale, rooms = [], allEquipments = [] }: EquipmentProps) {
   const shapeRef = useRef<Konva.Group>(null);
   const trRef = useRef<Konva.Transformer>(null);
 
@@ -72,6 +221,7 @@ function Equipment({ data, isSelected, onSelect, onChange, scale }: EquipmentPro
       ...data,
       x: e.target.x(),
       y: e.target.y(),
+      rotation: e.target.rotation(),
     });
   };
 
@@ -103,26 +253,75 @@ function Equipment({ data, isSelected, onSelect, onChange, scale }: EquipmentPro
         // Center origin for easier rotation
         offsetX={data.type === 'Door' ? 0 : dims.width / 2}
         offsetY={data.type === 'Door' ? 0 : dims.height / 2}
-        dragBoundFunc={function(this: any, pos) {
-           if (data.isLocked) return this.getAbsolutePosition();
-           
-           const stage = this.getStage();
-           if (!stage) return pos;
-           const transform = stage.getAbsoluteTransform().copy();
-           transform.invert();
-           const relativePos = transform.point(pos);
-           
-           // Calculate visual width/height based on rotation to snap EDGES instead of center
-           const rot = (data.rotation % 180 + 180) % 180;
-           const isHorizontal = rot < 45 || rot > 135;
-           const vw = isHorizontal ? dims.width : dims.height;
-           const vh = isHorizontal ? dims.height : dims.width;
+        onDragMove={(e) => {
+          if (data.isLocked) return;
 
-           const snappedRelative = {
-              x: snapToGrid(relativePos.x - vw / 2, scale) + vw / 2,
-              y: snapToGrid(relativePos.y - vh / 2, scale) + vh / 2
-           };
-           return stage.getAbsoluteTransform().point(snappedRelative);
+          const nx = e.target.x();
+          const ny = e.target.y();
+          let nrot = e.target.rotation();
+
+          // Calculate visual width/height based on rotation
+          const rotMod = (nrot % 180 + 180) % 180;
+          const isHorizontal = rotMod < 45 || rotMod > 135;
+          const vw = isHorizontal ? dims.width : dims.height;
+          const vh = isHorizontal ? dims.height : dims.width;
+
+          let targetX = snapToGrid(nx - vw / 2, scale) + vw / 2;
+          let targetY = snapToGrid(ny - vh / 2, scale) + vh / 2;
+          let targetRot = nrot;
+
+          if (data.type === 'Door' && rooms) {
+            const SNAP_DIST = 15 / scale;
+            let closestX = 0;
+            let closestY = 0;
+            let found = false;
+            let minDist = Infinity;
+
+            rooms.forEach(room => {
+              for (let i = 0; i < room.points.length; i++) {
+                const p1 = room.points[i];
+                const p2 = room.points[(i + 1) % room.points.length];
+                const closest = getClosestPointOnSegment({x: nx, y: ny}, p1, p2);
+                if (closest.dist < minDist && closest.dist < SNAP_DIST) {
+                  minDist = closest.dist;
+                  closestX = closest.x;
+                  closestY = closest.y;
+                  found = true;
+                }
+              }
+            });
+
+            if (found) {
+              targetX = closestX;
+              targetY = closestY;
+            } else {
+              targetX = snapToGrid(nx, scale);
+              targetY = snapToGrid(ny, scale);
+            }
+          } else if (data.type !== 'Door') {
+            const clearanceCm = data.clearance ?? 40;
+            const clearancePx = clearanceCm / 2;
+            
+            // 1st Priority: Equipment to Equipment Snapping
+            let bestSnap: { x: number, y: number, rotation: number, score: number } | null = null;
+            if (allEquipments) {
+              bestSnap = getEqToEqSnap(data.id, nx, ny, nrot, dims, clearancePx, allEquipments, scale);
+            }
+
+            // 2nd Priority: Wall Snapping
+            if (!bestSnap && rooms) {
+              bestSnap = getEquipmentSnap(nx, ny, nrot, dims, clearancePx, rooms, scale);
+            }
+
+            if (bestSnap) {
+              targetX = bestSnap.x;
+              targetY = bestSnap.y;
+              targetRot = bestSnap.rotation;
+            }
+          }
+
+          e.target.position({ x: targetX, y: targetY });
+          e.target.rotation(targetRot);
         }}
         onMouseEnter={(e) => {
           if (data.isLocked) return;
