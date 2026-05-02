@@ -82,7 +82,7 @@ export default function Home() {
     auxiliary: { reception: boolean; consultation: boolean; locker: boolean; lounge: boolean };
     clearanceX: number | '';
     clearanceY: number | '';
-    layoutShape: 'auto' | 'parallel' | 'l-shape' | 'u-shape';
+    layoutShape: 'auto' | 'parallel' | 'l-shape' | 'n-shape' | 'u-shape';
   }>({
     mode: 'pyeong',
     pyeong: 30,

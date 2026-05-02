@@ -22,7 +22,7 @@ export interface AILayoutParams {
   };
   clearanceX: number;
   clearanceY: number;
-  layoutShape: 'auto' | 'parallel' | 'l-shape' | 'u-shape';
+  layoutShape: 'auto' | 'parallel' | 'l-shape' | 'n-shape' | 'u-shape';
 }
 
 // Helper to generate a room
@@ -255,9 +255,7 @@ export function generateAILayout(params: AILayoutParams): { rooms: RoomData[], e
     if (receptionBlock) {
       topBlocks.push(receptionBlock);
     }
-  } else if (layoutShape === 'n-shape' || layoutShape === 'ㄴ자형') {
-    // Treat 'ㄴ자형' as 'n-shape' internally
-    layoutShape = 'n-shape';
+  } else if (layoutShape === 'n-shape') {
     for (const b of blocks) {
       if (leftHeight <= bottomWidth) {
         leftBlocks.push(b);
