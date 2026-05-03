@@ -17,7 +17,6 @@ export async function GET(req: Request) {
     // 1. Fetch user's quote_requests
     const quotesSnapshot = await adminDb.collection('quote_requests')
       .where('userEmail', '==', userEmail)
-      .orderBy('createdAt', 'desc')
       .get();
 
     if (quotesSnapshot.empty) {
@@ -26,8 +25,11 @@ export async function GET(req: Request) {
 
     const quotes = quotesSnapshot.docs.map(doc => ({
       id: doc.id,
-      ...doc.data()
-    }));
+      ...doc.data(),
+      createdAt: doc.data().createdAt || new Date().toISOString()
+    })).sort((a: any, b: any) => {
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
 
     // 2. Fetch all estimates for these quotes
     const quoteIds = quotes.map(q => q.id);
@@ -38,17 +40,20 @@ export async function GET(req: Request) {
       const chunk = quoteIds.slice(i, i + 10);
       const estimatesSnapshot = await adminDb.collection('sent_estimates')
         .where('quoteId', 'in', chunk)
-        .orderBy('createdAt', 'desc')
         .get();
         
       estimatesSnapshot.forEach(doc => {
         estimates.push({
           id: doc.id,
           ...doc.data(),
-          createdAt: doc.data().createdAt?.toDate()?.toISOString() || null
+          createdAt: doc.data().createdAt?.toDate()?.toISOString() || new Date().toISOString()
         });
       });
     }
+
+    estimates.sort((a: any, b: any) => {
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
 
     // 3. Join estimates into quotes
     const joinedQuotes = quotes.map(quote => ({

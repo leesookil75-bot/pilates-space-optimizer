@@ -14,14 +14,15 @@ export async function GET(req: Request) {
 
     const snapshot = await adminDb.collection('sent_estimates')
       .where('quoteId', '==', quoteId)
-      .orderBy('createdAt', 'desc')
       .get();
 
     const estimates = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data(),
       createdAt: doc.data().createdAt?.toDate()?.toISOString() || new Date().toISOString()
-    }));
+    })).sort((a: any, b: any) => {
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
 
     return NextResponse.json({ estimates });
   } catch (error: any) {
