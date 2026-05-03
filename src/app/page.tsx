@@ -1102,13 +1102,19 @@ export default function Home() {
                   />
                 </div>
                 <p style={{ fontSize: '11px', color: '#6b7280', margin: 0, lineHeight: 1.4 }}>
-                  실제 기구의 치수(cm)를 입력하시면 도면에 정확한 비율로 반영됩니다.
+                  실제 기구의 치수(cm)를 입력하시면 도면에 즉시 반영됩니다.
                 </p>
                 <button 
-                  onClick={() => removeEquipment(selectedEquipment.id)}
-                  style={{ marginTop: '12px', width: '100%', padding: '8px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
+                  onClick={() => setSelectedId(null)}
+                  style={{ marginTop: '16px', width: '100%', padding: '8px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
                 >
-                  🗑️ 삭제
+                  ✅ 확인 (선택 해제)
+                </button>
+                <button 
+                  onClick={() => removeEquipment(selectedEquipment.id)}
+                  style={{ marginTop: '8px', width: '100%', padding: '8px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  🗑️ 기구 삭제
                 </button>
               </div>
             </>
