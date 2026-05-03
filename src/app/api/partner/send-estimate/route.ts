@@ -71,7 +71,7 @@ export async function POST(req: Request) {
     });
     
     await fileRef.makePublic();
-    const fileUrl = \`https://storage.googleapis.com/\${bucket.name}/\${fileName}\`;
+    const fileUrl = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
 
     // 4. Send email using Nodemailer (wrapped in try-catch so it doesn't block the main flow)
     try {
