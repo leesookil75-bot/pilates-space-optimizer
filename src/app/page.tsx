@@ -57,6 +57,9 @@ export default function Home() {
   // Sync ref with current state so the batched commit always uses the absolute latest
   latestStateRef.current = { rooms, equipments };
 
+  // Unread Estimates State
+  const [unreadCount, setUnreadCount] = useState(0);
+
   // Quote Request Modal State
   const [showQuoteModal, setShowQuoteModal] = useState(false);
   const [quoteForm, setQuoteForm] = useState({
@@ -147,6 +150,30 @@ export default function Home() {
       }));
     }
   }, [session, showQuoteModal]);
+
+  // Fetch unread estimates count
+  useEffect(() => {
+    const fetchUnread = async () => {
+      if (session?.user?.email) {
+        try {
+          const res = await fetch('/api/quotes/unread');
+          if (res.ok) {
+            const data = await res.json();
+            setUnreadCount(data.unreadCount || 0);
+          }
+        } catch (e) {
+          console.error('Failed to fetch unread count', e);
+        }
+      }
+    };
+    
+    fetchUnread();
+    
+    // Listen for custom event from MyPage to clear badge
+    const handleRead = () => fetchUnread();
+    window.addEventListener('estimatesRead', handleRead);
+    return () => window.removeEventListener('estimatesRead', handleRead);
+  }, [session]);
 
   // Auto-save to LocalStorage on changes
   useEffect(() => {
@@ -741,6 +768,45 @@ export default function Home() {
             <span className={styles.desktopOnly}>📐 새 도면 시작하기</span>
             <span className={styles.mobileOnly}>📐 새 도면</span>
           </button>
+          {session?.user && (
+            <button 
+              className={styles.headerButton}
+              onClick={() => window.location.href = '/mypage'}
+              style={{
+                position: 'relative',
+                background: '#10b981',
+                color: 'white',
+                border: 'none',
+                padding: '8px 16px',
+                borderRadius: '6px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)'
+              }}>
+              <span className={styles.desktopOnly}>📦 내 견적함</span>
+              <span className={styles.mobileOnly}>📦 견적함</span>
+              {unreadCount > 0 && (
+                <span style={{
+                  position: 'absolute',
+                  top: '-5px',
+                  right: '-5px',
+                  background: '#ef4444',
+                  color: 'white',
+                  borderRadius: '50%',
+                  width: '20px',
+                  height: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  boxShadow: '0 0 0 2px white'
+                }}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+          )}
           <button 
             className={styles.headerButton}
             onClick={() => setShowQuoteModal(true)}

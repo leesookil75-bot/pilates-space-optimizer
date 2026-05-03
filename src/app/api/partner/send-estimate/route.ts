@@ -155,6 +155,7 @@ export async function POST(req: Request) {
       price: estimatePrice || null,
       message: message || '',
       fileUrl,
+      isRead: false,
       createdAt: FieldValue.serverTimestamp()
     }).catch(e => console.error("Error logging sent_estimate:", e));
 

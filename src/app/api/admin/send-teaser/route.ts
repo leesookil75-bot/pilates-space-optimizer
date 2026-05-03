@@ -164,6 +164,33 @@ export async function POST(req: Request) {
 
     console.log(`Teaser emails sent: ${successCount} / ${targetEmails.length}`);
 
+    // [New Feature] Send notification email to the Consumer (Customer)
+    const customerEmail = quoteData.customerEmail || quoteData.userEmail;
+    if (customerEmail && successCount > 0) {
+      const consumerMailOptions = {
+        from: `"PILA-SPACE" <${process.env.EMAIL_USER}>`,
+        to: customerEmail,
+        subject: `[필라테스 스페이스] 작성해주신 견적 요청이 파트너사로 전달되었습니다.`,
+        html: `
+          <div style="font-family: 'Malgun Gothic', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
+            <h2 style="color: #3b82f6;">견적 요청서 전달 완료 🚀</h2>
+            <p>안녕하세요!</p>
+            <p>고객님께서 작성해주신 <strong>${region}</strong> 지역 필라테스 센터 견적 요청이 방금 검증된 우수 파트너사들에게 성공적으로 전달되었습니다.</p>
+            <p>현재 파트너사들이 도면과 요청사항을 꼼꼼히 분석 중입니다.</p>
+            <div style="background-color: #f3f4f6; padding: 16px; border-radius: 6px; margin: 20px 0;">
+              <p style="margin: 0; color: #4b5563; font-size: 14px;">빠르면 오늘 중으로 파트너사들이 맞춤 견적서를 보내드릴 예정입니다. 견적서가 도착하면 다시 알림을 드리겠습니다!</p>
+            </div>
+            <a href="${appUrl}/mypage" style="display: inline-block; background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">내 견적함에서 진행상황 확인하기</a>
+          </div>
+        `
+      };
+      try {
+        await transporter.sendMail(consumerMailOptions);
+      } catch (err) {
+        console.error('Failed to send email to consumer in send-teaser:', err);
+      }
+    }
+
     return NextResponse.json({ success: true, sentCount: successCount });
   } catch (error: any) {
     console.error('Error sending teaser emails:', error);
