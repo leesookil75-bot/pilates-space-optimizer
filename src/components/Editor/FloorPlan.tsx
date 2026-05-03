@@ -412,11 +412,25 @@ function FloorPlan({ room, allRooms = [], hasInnerRooms = false, onChange, scale
             angle += 180;
           }
 
+          // Find outer room centroid to determine "inside vs outside" for deduplication
+          let outerCx = cx, outerCy = cy;
+          const outerRoom = allRooms.find(r => r.type === 'outer');
+          if (outerRoom && outerRoom.points.length > 0) {
+            outerCx = 0; outerCy = 0;
+            outerRoom.points.forEach(p => { outerCx += p.x; outerCy += p.y; });
+            outerCx /= outerRoom.points.length;
+            outerCy /= outerRoom.points.length;
+          }
+
+          // Calculate "outwardness" score relative to the overall layout center
+          const outwardScore = nx * (mx - outerCx) + ny * (my - outerCy);
+
           const EPSILON = 1;
           let shouldDrawDimension = true;
           
-          // Deduplication 1: Skip if this room already drew a parallel dimension of the same length
-          for (let j = 0; j < i; j++) {
+          // Deduplication 1: Skip if there's a parallel dimension of the same length with a BETTER outward score
+          for (let j = 0; j < localPoints.length; j++) {
+            if (i === j) continue;
             const op1 = localPoints[j];
             const op2 = localPoints[(j + 1) % localPoints.length];
             const odx = op2.x - op1.x;
@@ -428,16 +442,36 @@ function FloorPlan({ room, allRooms = [], hasInnerRooms = false, onChange, scale
               if (oAngle > 90 || oAngle <= -90) oAngle += 180;
               
               if (Math.abs(angle - oAngle) < EPSILON) {
-                shouldDrawDimension = false;
-                break;
+                // Calculate its normal
+                const oux = odx / oL;
+                const ouy = ody / oL;
+                let onx = ouy;
+                let ony = -oux;
+                const omx = (op1.x + op2.x) / 2;
+                const omy = (op1.y + op2.y) / 2;
+                if (onx * (omx - cx) + ony * (omy - cy) < 0) {
+                  onx = -onx;
+                  ony = -ony;
+                }
+                const oOutwardScore = onx * (omx - outerCx) + ony * (omy - outerCy);
+                
+                // If the other edge has a better outward score, we skip this one
+                // If scores are very close, use index as tie-breaker
+                if (oOutwardScore > outwardScore + EPSILON) {
+                  shouldDrawDimension = false;
+                  break;
+                } else if (Math.abs(oOutwardScore - outwardScore) <= EPSILON && j < i) {
+                  shouldDrawDimension = false;
+                  break;
+                }
               }
             }
           }
 
-          // Deduplication 2: Check if any other room has an identical segment
-          if (shouldDrawDimension) {
+          // Deduplication 2: Check if any other INNER room has an identical segment
+          if (shouldDrawDimension && !isOuter) {
             for (const other of allRooms) {
-              if (other.id === room.id) continue;
+              if (other.id === room.id || other.type === 'outer') continue;
               
               let hasOverlap = false;
               const op = other.points;
@@ -454,16 +488,9 @@ function FloorPlan({ room, allRooms = [], hasInnerRooms = false, onChange, scale
                 }
               }
               
-              if (hasOverlap) {
-                // If it overlaps with the outer wall, let the outer wall draw it.
-                // If it overlaps with another inner room, let the one with the smaller ID draw it.
-                if (other.type === 'outer') {
-                  shouldDrawDimension = false;
-                  break;
-                } else if (other.id < room.id) {
-                  shouldDrawDimension = false;
-                  break;
-                }
+              if (hasOverlap && other.id < room.id) {
+                shouldDrawDimension = false;
+                break;
               }
             }
           }
