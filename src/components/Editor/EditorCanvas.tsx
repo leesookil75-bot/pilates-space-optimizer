@@ -581,54 +581,69 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
                       }}
                       onDragMove={(e) => {
                         if (e.target !== e.currentTarget) return;
-                        let dx = e.target.x() - centerX;
-                        let dy = e.target.y() - centerY;
+                        
+                        let rawDx = e.target.x() - centerX;
+                        let rawDy = e.target.y() - centerY;
+                        
+                        const SNAP_THRESHOLD = 20 / scale;
+                        const snapSizeVal = scale > 0.8 ? 25 : 50;
+                        let finalDx = Math.round(rawDx / snapSizeVal) * snapSizeVal;
+                        let finalDy = Math.round(rawDy / snapSizeVal) * snapSizeVal;
 
-                        const SNAP_DIST = 15 / scale;
-                        let snapDx = 0;
-                        let snapDy = 0;
-                        let foundSnap = false;
-
+                        const targetXs = new Set<number>();
+                        const targetYs = new Set<number>();
+                        
                         for (const otherRoom of rooms) {
                           if (otherRoom.id === room.id) continue;
-                          for (let i = 0; i < room.points.length && !foundSnap; i++) {
-                            const movingP = { x: room.points[i].x + dx, y: room.points[i].y + dy };
-                            
-                            // 1. Point to Point
-                            for (let j = 0; j < otherRoom.points.length; j++) {
-                               const op = otherRoom.points[j];
-                               if (Math.hypot(movingP.x - op.x, movingP.y - op.y) < SNAP_DIST) {
-                                  snapDx = op.x - movingP.x;
-                                  snapDy = op.y - movingP.y;
-                                  foundSnap = true;
-                                  break;
-                               }
-                            }
-                            if (foundSnap) break;
-                            
-                            // 2. Point to Line
-                            for (let j = 0; j < otherRoom.points.length; j++) {
-                               const op1 = otherRoom.points[j];
-                               const op2 = otherRoom.points[(j + 1) % otherRoom.points.length];
-                               const closest = getClosestPointOnSegment(movingP, op1, op2);
-                               if (closest.dist < SNAP_DIST) {
-                                  snapDx = closest.x - movingP.x;
-                                  snapDy = closest.y - movingP.y;
-                                  foundSnap = true;
-                                  break;
-                               }
+                          for (const p of otherRoom.points) {
+                            targetXs.add(p.x);
+                            targetYs.add(p.y);
+                          }
+                        }
+                        
+                        const myXs = new Set<number>();
+                        const myYs = new Set<number>();
+                        for (const p of initialRoomPointsRef.current) {
+                          myXs.add(p.x);
+                          myYs.add(p.y);
+                        }
+
+                        let bestDx = finalDx;
+                        let bestDistX = Infinity;
+                        let snappedX = false;
+                        
+                        for (const mx of Array.from(myXs)) {
+                          const currentX = mx + rawDx;
+                          for (const tx of Array.from(targetXs)) {
+                            const dist = Math.abs(currentX - tx);
+                            if (dist < SNAP_THRESHOLD && dist < bestDistX) {
+                              bestDistX = dist;
+                              bestDx = tx - mx;
+                              snappedX = true;
                             }
                           }
-                          if (foundSnap) break;
                         }
+                        if (snappedX) finalDx = bestDx;
 
-                        if (foundSnap) {
-                          dx += snapDx;
-                          dy += snapDy;
-                          e.target.position({ x: centerX + dx, y: centerY + dy });
+                        let bestDy = finalDy;
+                        let bestDistY = Infinity;
+                        let snappedY = false;
+
+                        for (const my of Array.from(myYs)) {
+                          const currentY = my + rawDy;
+                          for (const ty of Array.from(targetYs)) {
+                            const dist = Math.abs(currentY - ty);
+                            if (dist < SNAP_THRESHOLD && dist < bestDistY) {
+                              bestDistY = dist;
+                              bestDy = ty - my;
+                              snappedY = true;
+                            }
+                          }
                         }
+                        if (snappedY) finalDy = bestDy;
 
-                        handleRoomDragMove(dx, dy, 'badge');
+                        e.target.position({ x: centerX + finalDx, y: centerY + finalDy });
+                        handleRoomDragMove(finalDx, finalDy, 'badge');
                       }}
                       onDragEnd={(e) => {
                         if (e.target !== e.currentTarget) return;
