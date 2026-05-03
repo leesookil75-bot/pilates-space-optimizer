@@ -4,6 +4,7 @@ import { useSession, signIn } from 'next-auth/react';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { FileText, Clock, Package, ArrowRight } from 'lucide-react';
+import styles from './mypage.module.css';
 
 interface Estimate {
   id: string;
@@ -104,18 +105,18 @@ export default function MyPage() {
   if (status === 'unauthenticated') return null;
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb', padding: '48px 16px' }}>
-      <div style={{ maxWidth: '896px', margin: '0 auto' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
+    <div className={styles.container}>
+      <div className={styles.inner}>
+        <div className={styles.header}>
           <div>
-            <h1 style={{ fontSize: '1.875rem', fontWeight: 800, color: '#111827', margin: 0 }}>내 견적함 📦</h1>
+            <h1 style={{ fontSize: 'clamp(1.375rem, 5vw, 1.875rem)', fontWeight: 800, color: '#111827', margin: 0 }}>내 견적함 📦</h1>
             <p style={{ marginTop: '8px', fontSize: '0.875rem', color: '#4b5563', margin: '8px 0 0 0' }}>
               {session?.user?.name}님이 요청하신 필라테스 인테리어/기구 견적 진행 상황입니다.
             </p>
           </div>
           <button
             onClick={() => router.push('/')}
-            style={{ color: '#2563eb', fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem' }}
+            className={styles.backButton}
           >
             &larr; 도면 편집기로 돌아가기
           </button>
@@ -141,18 +142,18 @@ export default function MyPage() {
               
               return (
                 <div key={quote.id} style={{ backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
-                  <div style={{ padding: '20px 24px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                  <div className={styles.quoteCardHeader}>
+                    <div className={styles.quoteCardHeaderRow}>
                       <div>
-                        <h3 style={{ fontSize: '1.125rem', lineHeight: '1.5rem', fontWeight: 600, color: '#111827', display: 'flex', alignItems: 'center', margin: 0 }}>
+                        <h3 style={{ fontSize: '1.125rem', lineHeight: '1.5rem', fontWeight: 600, color: '#111827', display: 'flex', alignItems: 'center', margin: 0, flexWrap: 'wrap', gap: '8px' }}>
                           {quote.region} 필라테스 오픈 건
                           {unreadCount > 0 && (
-                            <span style={{ marginLeft: '12px', display: 'inline-flex', alignItems: 'center', padding: '2px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 500, backgroundColor: '#fee2e2', color: '#991b1b' }}>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 500, backgroundColor: '#fee2e2', color: '#991b1b' }}>
                               새 견적 {unreadCount}건
                             </span>
                           )}
                         </h3>
-                        <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', fontSize: '0.875rem', color: '#6b7280', gap: '16px' }}>
+                        <div className={styles.quoteMeta} style={{ marginTop: '4px' }}>
                           <span style={{ display: 'flex', alignItems: 'center' }}>
                             <Clock style={{ flexShrink: 0, marginRight: '6px', height: '16px', width: '16px', color: '#9ca3af' }} />
                             오픈예정: {quote.expectedDate}
@@ -184,7 +185,7 @@ export default function MyPage() {
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                         <h4 style={{ fontWeight: 500, color: '#111827', margin: 0 }}>도착한 견적서 ({quote.estimates!.length}건)</h4>
-                        <div style={{ display: 'grid', gap: '16px', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
+                        <div className={styles.estimateGrid}>
                           {quote.estimates!.map((est) => (
                             <div 
                               key={est.id} 

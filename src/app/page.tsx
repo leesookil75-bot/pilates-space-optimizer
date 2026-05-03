@@ -1195,9 +1195,9 @@ export default function Home() {
         }}>
           <div style={{
             background: 'white',
-            padding: '40px',
+            padding: 'clamp(20px, 5vw, 40px)',
             borderRadius: '16px',
-            maxWidth: '500px',
+            width: 'min(500px, calc(100vw - 32px))',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
             textAlign: 'center'
           }}>
@@ -1240,8 +1240,8 @@ export default function Home() {
           backdropFilter: 'blur(4px)'
         }}>
           <div style={{
-            background: 'white', padding: '32px', borderRadius: '16px',
-            width: '450px', maxHeight: '90vh', overflowY: 'auto',
+            background: 'white', padding: 'clamp(20px, 5vw, 32px)', borderRadius: '16px',
+            width: 'min(450px, calc(100vw - 32px))', maxHeight: '90vh', overflowY: 'auto',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
           }}>
             <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#111827', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
@@ -1319,8 +1319,8 @@ export default function Home() {
           backdropFilter: 'blur(4px)'
         }}>
           <div style={{
-            background: 'white', padding: '32px', borderRadius: '16px',
-            width: '400px', maxHeight: '90vh', overflowY: 'auto',
+            background: 'white', padding: 'clamp(20px, 5vw, 32px)', borderRadius: '16px',
+            width: 'min(400px, calc(100vw - 32px))', maxHeight: '90vh', overflowY: 'auto',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
           }}>
             <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#111827', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
@@ -1421,9 +1421,11 @@ export default function Home() {
         }}>
           <div style={{
             background: 'white',
-            padding: '32px',
+            padding: 'clamp(20px, 5vw, 32px)',
             borderRadius: '16px',
-            width: '400px',
+            width: 'min(400px, calc(100vw - 32px))',
+            maxHeight: '90vh',
+            overflowY: 'auto',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
           }}>
             <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#111827', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
@@ -1623,9 +1625,9 @@ export default function Home() {
         }}>
           <div style={{
             background: 'white',
-            padding: '32px',
+            padding: 'clamp(20px, 5vw, 32px)',
             borderRadius: '16px',
-            width: '400px',
+            width: 'min(400px, calc(100vw - 32px))',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
             textAlign: 'center'
           }}>
@@ -1670,8 +1672,8 @@ export default function Home() {
           backdropFilter: 'blur(4px)'
         }}>
           <div style={{
-            background: 'white', padding: '32px', borderRadius: '16px',
-            width: '450px', maxHeight: '90vh', overflowY: 'auto',
+            background: 'white', padding: 'clamp(20px, 5vw, 32px)', borderRadius: '16px',
+            width: 'min(450px, calc(100vw - 32px))', maxHeight: '90vh', overflowY: 'auto',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
           }}>
             <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#111827', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>

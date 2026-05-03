@@ -1,0 +1,90 @@
+.container {
+  min-height: 100vh;
+  background-color: #f9fafb;
+  padding: 48px 16px;
+}
+
+.inner {
+  max-width: 896px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 32px;
+  gap: 16px;
+}
+
+.backButton {
+  color: #2563eb;
+  font-weight: 500;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.estimateGrid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.quoteCardHeader {
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+  background-color: #f9fafb;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.quoteCardHeaderRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.quoteMeta {
+  display: flex;
+  align-items: center;
+  font-size: 0.875rem;
+  color: #6b7280;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .container {
+    padding: 20px 12px;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .backButton {
+    font-size: 0.875rem;
+  }
+
+  .estimateGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .quoteCardHeader {
+    padding: 16px;
+  }
+
+  .quoteMeta {
+    gap: 8px;
+  }
+}
