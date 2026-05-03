@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Editor, { EditorCanvasHandle, calculateRoomAreaInfo, isPointInPolygon } from '@/components/Editor/EditorCanvas';
 import { EquipmentData, EquipmentType, EQUIPMENT_DIMS } from '@/components/Editor/Equipment';
+import { RotateCw, Copy, Download, Share2, Menu, X, Check, Save, Send } from 'lucide-react';
 import { useSession, signIn } from 'next-auth/react';
 import styles from './page.module.css';
 
@@ -1550,21 +1551,61 @@ export default function Home() {
                   gap: '8px'
                 }}
               >
-                {isSubmittingQuote ? (
-                  <>
-                    <div style={{
-                      width: '20px', height: '20px', border: '3px solid rgba(255,255,255,0.3)', 
-                      borderTop: '3px solid white', borderRadius: '50%', animation: 'spin 1s linear infinite'
-                    }} />
-                    <span>도면을 안전하게 전송하고 있습니다...</span>
-                  </>
-                ) : (
-                  '도면 전송 및 무료 견적 받기'
-                )}
+                도면 전송 및 무료 견적 받기
               </button>
             </form>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Full Screen Loading Overlay (Paper Airplane Animation) */}
+      {isSubmittingQuote && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(255, 255, 255, 0.9)',
+          zIndex: 400,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backdropFilter: 'blur(8px)'
+        }}>
+          <style>{`
+            @keyframes fly {
+              0% { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+              20% { opacity: 1; }
+              50% { transform: translate(20px, -20px) rotate(10deg); }
+              80% { opacity: 1; }
+              100% { transform: translate(40px, -40px) rotate(20deg); opacity: 0; }
+            }
+            @keyframes dotPulse {
+              0% { opacity: 0.2; }
+              20% { opacity: 1; }
+              100% { opacity: 0.2; }
+            }
+          `}</style>
+          <div style={{ position: 'relative', width: '120px', height: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Send 
+              size={64} 
+              color="#3b82f6" 
+              style={{
+                animation: 'fly 2.5s ease-in-out infinite'
+              }}
+            />
+          </div>
+          <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1f2937', marginTop: '24px', display: 'flex', alignItems: 'center' }}>
+            도면 데이터를 안전하게 전송 중입니다
+            <span style={{ display: 'inline-flex', marginLeft: '4px' }}>
+              <span style={{ animation: 'dotPulse 1.4s infinite', animationDelay: '0s' }}>.</span>
+              <span style={{ animation: 'dotPulse 1.4s infinite', animationDelay: '0.2s' }}>.</span>
+              <span style={{ animation: 'dotPulse 1.4s infinite', animationDelay: '0.4s' }}>.</span>
+            </span>
+          </h3>
+          <p style={{ fontSize: '14px', color: '#6b7280', marginTop: '12px' }}>
+            파트너사들이 원장님의 도면을 바탕으로 견적을 산출할 수 있도록<br/>안전하게 암호화하여 발송하고 있습니다.
+          </p>
         </div>
       )}
 
