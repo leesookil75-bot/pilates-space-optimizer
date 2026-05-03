@@ -82,26 +82,18 @@ export default function PartnerDashboard() {
     
     setSendingEstimate(true);
     try {
-      // 1. Upload file to Firebase Storage
-      const fileExtension = estimateFile.name.split('.').pop();
-      const fileName = `estimates/${targetQuote.id}/${partnerId}_${Date.now()}.${fileExtension}`;
-      const storageRef = ref(storage, fileName);
-      
-      await uploadBytes(storageRef, estimateFile);
-      const fileUrl = await getDownloadURL(storageRef);
+      // Send API request with FormData (File will be uploaded on the server side)
+      const formData = new FormData();
+      formData.append('partnerId', partnerId);
+      formData.append('password', password);
+      formData.append('quoteId', targetQuote.id);
+      formData.append('estimatePrice', estimateForm.price);
+      formData.append('message', estimateForm.message);
+      formData.append('file', estimateFile);
 
-      // 2. Send API request with fileUrl
       const res = await fetch('/api/partner/send-estimate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          partnerId,
-          password,
-          quoteId: targetQuote.id,
-          estimatePrice: estimateForm.price, // Optional now
-          message: estimateForm.message,
-          fileUrl // Passed to backend
-        })
+        body: formData
       });
       
       const data = await res.json();

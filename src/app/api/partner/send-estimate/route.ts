@@ -1,23 +1,30 @@
 import { NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase-admin';
+import { adminDb, admin } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
-    const { partnerId, password, quoteId, estimatePrice, message, fileUrl } = await req.json();
+    const formData = await req.formData();
+    const partnerId = formData.get('partnerId') as string;
+    const password = formData.get('password') as string;
+    const quoteId = formData.get('quoteId') as string;
+    const estimatePrice = formData.get('estimatePrice') as string;
+    const message = formData.get('message') as string;
+    const file = formData.get('file') as File;
 
-    if (!partnerId || !password || !quoteId || !fileUrl) {
-      return NextResponse.json({ error: 'Missing parameters. File attachment is required.' }, { status: 400 });
+    if (!partnerId || !password || !quoteId || !file) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // 1. Verify partner
+    // 1. Verify Partner
     const partnerSnapshot = await adminDb.collection('partners')
       .where('partnerId', '==', partnerId)
       .where('password', '==', password)
+      .limit(1)
       .get();
-
+      
     if (partnerSnapshot.empty) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
@@ -52,10 +59,25 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: '고객의 이메일 주소가 등록되어 있지 않아 발송할 수 없습니다.' }, { status: 400 });
     }
 
-    // 4. Send email using Nodemailer
-    const nodemailer = require('nodemailer');
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
+    // Upload file to Firebase Storage via Admin SDK
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const fileExtension = file.name.split('.').pop() || 'pdf';
+    const fileName = `estimates/${quoteId}/${partnerId}_${Date.now()}.${fileExtension}`;
+    
+    const bucket = admin.storage().bucket(process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET);
+    const fileRef = bucket.file(fileName);
+    await fileRef.save(buffer, {
+      metadata: { contentType: file.type }
+    });
+    
+    await fileRef.makePublic();
+    const fileUrl = \`https://storage.googleapis.com/\${bucket.name}/\${fileName}\`;
+
+    // 4. Send email using Nodemailer (wrapped in try-catch so it doesn't block the main flow)
+    try {
+      const nodemailer = require('nodemailer');
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_APP_PASSWORD,
@@ -128,6 +150,10 @@ export async function POST(req: Request) {
         </div>
       `
     });
+    } catch (emailError) {
+      console.error('Failed to send email notification, but proceeding with estimate submission:', emailError);
+      // We do not throw or return here, allowing the database logic to proceed.
+    }
 
     // 6. Deduct coins and update partner's estimatedQuotes if not free
     if (!isFreeToSend) {
