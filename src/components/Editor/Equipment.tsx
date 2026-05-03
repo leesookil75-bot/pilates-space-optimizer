@@ -369,14 +369,15 @@ function Equipment({ data, isSelected, onSelect, onChange, scale, rooms = [], al
             <Text
               x={dims.width / 2}
               y={dims.width / 2}
-              text="문"
+              text="Door"
               fontSize={14}
               fontStyle="bold"
               fill="#4b5563"
               align="center"
               verticalAlign="middle"
-              offsetX={7}
+              offsetX={15}
               offsetY={7}
+              rotation={-data.rotation}
             />
           </Group>
         ) : (
