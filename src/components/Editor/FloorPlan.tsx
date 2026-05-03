@@ -510,8 +510,40 @@ function FloorPlan({ room, allRooms = [], hasInnerRooms = false, onChange, scale
             ny = -ny;
           }
 
-          const offsetDist = 35 / scale;
+          let offsetDist = 35 / scale;
           const overshoot = 10 / scale;
+
+          let outerCx = cx, outerCy = cy;
+          const outerRoom = allRooms.find(r => r.type === 'outer');
+          if (outerRoom && outerRoom.points.length > 0) {
+            outerCx = 0; outerCy = 0;
+            outerRoom.points.forEach(p => { outerCx += p.x; outerCy += p.y; });
+            outerCx /= outerRoom.points.length;
+            outerCy /= outerRoom.points.length;
+          }
+
+          // Calculate offsetDist for pushing internal dimensions OUTSIDE the floor plan (Tier 3)
+          if (outerRoom && outerRoom.points.length > 0) {
+            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            outerRoom.points.forEach(p => {
+              if (p.x < minX) minX = p.x;
+              if (p.x > maxX) maxX = p.x;
+              if (p.y < minY) minY = p.y;
+              if (p.y > maxY) maxY = p.y;
+            });
+
+            let distToOuter = 0;
+            if (Math.abs(nx) > Math.abs(ny)) {
+              distToOuter = nx > 0 ? (maxX - p1.x) : (p1.x - minX);
+            } else {
+              distToOuter = ny > 0 ? (maxY - p1.y) : (p1.y - minY);
+            }
+            
+            // Tier 3 starts at offset 95. Stagger by 30 based on coordinate to avoid overlap.
+            const coord = Math.round(Math.abs(nx) > Math.abs(ny) ? p1.x : p1.y);
+            const stagger = (Math.floor(coord / 10) % 3) * (30 / scale);
+            offsetDist = distToOuter + 95 / scale + stagger;
+          }
 
           const dimStartX = p1.x + nx * offsetDist;
           const dimStartY = p1.y + ny * offsetDist;
@@ -523,15 +555,6 @@ function FloorPlan({ room, allRooms = [], hasInnerRooms = false, onChange, scale
 
           let angle = Math.atan2(dy, dx) * (180 / Math.PI);
           angle = (angle % 180 + 180) % 180;
-
-          let outerCx = cx, outerCy = cy;
-          const outerRoom = allRooms.find(r => r.type === 'outer');
-          if (outerRoom && outerRoom.points.length > 0) {
-            outerCx = 0; outerCy = 0;
-            outerRoom.points.forEach(p => { outerCx += p.x; outerCy += p.y; });
-            outerCx /= outerRoom.points.length;
-            outerCy /= outerRoom.points.length;
-          }
 
           const outwardScore = nx * (mx - outerCx) + ny * (my - outerCy);
           const EPSILON = 1;
@@ -611,8 +634,8 @@ function FloorPlan({ room, allRooms = [], hasInnerRooms = false, onChange, scale
 
           return (
             <Group key={`dim-${i}`} listening={false}>
-              <Line points={[p1.x + nx * (10/scale), p1.y + ny * (10/scale), p1.x + nx * (offsetDist + overshoot), p1.y + ny * (offsetDist + overshoot)]} stroke="#9ca3af" strokeWidth={1/scale} />
-              <Line points={[p2.x + nx * (10/scale), p2.y + ny * (10/scale), p2.x + nx * (offsetDist + overshoot), p2.y + ny * (offsetDist + overshoot)]} stroke="#9ca3af" strokeWidth={1/scale} />
+              <Line points={[p1.x + nx * (10/scale), p1.y + ny * (10/scale), p1.x + nx * (offsetDist + overshoot), p1.y + ny * (offsetDist + overshoot)]} stroke="#d1d5db" strokeWidth={1/scale} dash={[4/scale, 4/scale]} />
+              <Line points={[p2.x + nx * (10/scale), p2.y + ny * (10/scale), p2.x + nx * (offsetDist + overshoot), p2.y + ny * (offsetDist + overshoot)]} stroke="#d1d5db" strokeWidth={1/scale} dash={[4/scale, 4/scale]} />
               <Arrow points={[dimStartX, dimStartY, dimEndX, dimEndY]} stroke="#9ca3af" strokeWidth={1.5/scale} fill="#9ca3af" pointerAtBeginning={true} pointerLength={6/scale} pointerWidth={6/scale} />
               <Text x={dimMidX} y={dimMidY} width={200/scale} offsetX={100/scale} offsetY={6/scale} text={`${distanceCm.toLocaleString()} cm`} fontSize={12/scale} fontStyle="bold" fill="#374151" stroke="white" strokeWidth={8/scale} fillAfterStrokeEnabled={true} align="center" rotation={angle} />
             </Group>
