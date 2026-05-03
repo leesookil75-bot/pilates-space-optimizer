@@ -70,14 +70,22 @@ export async function POST(req: Request) {
     const crypto = require('crypto');
     const downloadToken = crypto.randomUUID();
     
-    await fileRef.save(buffer, {
-      metadata: { 
-        contentType: file.type,
-        metadata: {
-          firebaseStorageDownloadTokens: downloadToken
+    try {
+      await fileRef.save(buffer, {
+        metadata: { 
+          contentType: file.type,
+          metadata: {
+            firebaseStorageDownloadTokens: downloadToken
+          }
         }
+      });
+    } catch (uploadError: any) {
+      console.error("Firebase Storage Upload Error:", uploadError);
+      if (uploadError.code === 404 || uploadError.message?.includes('Not Found')) {
+        return NextResponse.json({ error: 'Firebase Storage가 활성화되지 않았습니다. Firebase 콘솔에서 Storage를 시작해 주세요.' }, { status: 500 });
       }
-    });
+      return NextResponse.json({ error: '파일 업로드 중 오류가 발생했습니다: ' + uploadError.message }, { status: 500 });
+    }
     
     // Construct the standard Firebase Storage download URL that relies on the token
     const encodedFileName = encodeURIComponent(fileName);
