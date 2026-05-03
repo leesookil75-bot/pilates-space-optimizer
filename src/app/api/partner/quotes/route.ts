@@ -89,6 +89,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ 
       quotes, 
       partner: { 
+        companyName: partnerData.companyName || '',
         coins: partnerData.coins || 0, 
         unlockedQuotes,
         estimatedQuotes: partnerData.estimatedQuotes || []
