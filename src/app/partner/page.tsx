@@ -360,7 +360,9 @@ export default function PartnerDashboard() {
     <div style={{ minHeight: '100vh', background: '#f8fafc', padding: '32px' }}>
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <h1 style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#0f172a' }}>🤝 제휴사 파트너 오더 현황</h1>
+          <h1 style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#0f172a' }}>
+            🤝 {partnerData ? `${partnerData.companyName} 파트너 오더 현황` : '제휴사 파트너 오더 현황'}
+          </h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             {partnerData && (
               <>
