@@ -154,7 +154,7 @@ export default function Home() {
   // Fetch unread estimates count
   useEffect(() => {
     const fetchUnread = async () => {
-      if (session?.user?.email) {
+      if (status === 'authenticated') {
         try {
           const res = await fetch('/api/quotes/unread');
           if (res.ok) {
@@ -173,7 +173,7 @@ export default function Home() {
     const handleRead = () => fetchUnread();
     window.addEventListener('estimatesRead', handleRead);
     return () => window.removeEventListener('estimatesRead', handleRead);
-  }, [session]);
+  }, [status]);
 
   // Auto-save to LocalStorage on changes
   useEffect(() => {

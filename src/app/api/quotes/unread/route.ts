@@ -8,22 +8,32 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || !session.user || !session.user.email) {
+    if (!session || !session.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const userEmail = session.user.email;
+    const userName = session.user.name;
+
+    if (!userEmail && !userName) {
+      return NextResponse.json({ error: 'No user identifier found' }, { status: 400 });
+    }
 
     // 1. Fetch user's quote_requests
-    const quotesSnapshot = await adminDb.collection('quote_requests')
-      .where('userEmail', '==', userEmail)
-      .get();
+    let quotesQuery: any = adminDb.collection('quote_requests');
+    if (userEmail) {
+      quotesQuery = quotesQuery.where('userEmail', '==', userEmail);
+    } else {
+      quotesQuery = quotesQuery.where('userName', '==', userName);
+    }
+
+    const quotesSnapshot = await quotesQuery.get();
 
     if (quotesSnapshot.empty) {
       return NextResponse.json({ unreadCount: 0 });
     }
 
-    const quoteIds = quotesSnapshot.docs.map(doc => doc.id);
+    const quoteIds = quotesSnapshot.docs.map((doc: any) => doc.id);
 
     // 2. Since Firestore 'in' query supports max 10, we'll chunk it if needed
     // But usually a user doesn't have more than 10 quotes. 
