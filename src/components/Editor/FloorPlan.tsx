@@ -408,9 +408,8 @@ function FloorPlan({ room, allRooms = [], hasInnerRooms = false, onChange, scale
           const dimMidY = (dimStartY + dimEndY) / 2;
 
           let angle = Math.atan2(dy, dx) * (180 / Math.PI);
-          if (angle > 90 || angle <= -90) {
-            angle += 180;
-          }
+          // Normalize angle to [0, 180) to correctly match parallel lines regardless of their drawing direction
+          angle = (angle % 180 + 180) % 180;
 
           // Find outer room centroid to determine "inside vs outside" for deduplication
           let outerCx = cx, outerCy = cy;
@@ -439,7 +438,7 @@ function FloorPlan({ room, allRooms = [], hasInnerRooms = false, onChange, scale
             
             if (Math.abs(L - oL) < EPSILON) {
               let oAngle = Math.atan2(ody, odx) * (180 / Math.PI);
-              if (oAngle > 90 || oAngle <= -90) oAngle += 180;
+              oAngle = (oAngle % 180 + 180) % 180;
               
               if (Math.abs(angle - oAngle) < EPSILON) {
                 // Calculate its normal
