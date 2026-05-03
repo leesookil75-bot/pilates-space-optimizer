@@ -63,6 +63,7 @@ export default function Home() {
   // Quote Request Modal State
   const [showQuoteModal, setShowQuoteModal] = useState(false);
   const [isSubmittingQuote, setIsSubmittingQuote] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [quoteForm, setQuoteForm] = useState({
     name: '',
     phone: '',
@@ -442,6 +443,9 @@ export default function Home() {
 
     setIsSubmittingQuote(true);
 
+    // 강제로 브라우저 렌더링을 한 번 실행하도록 100ms 대기 (로딩 스피너를 무조건 그리도록)
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     try {
       const res = await fetch('/api/quotes', {
         method: 'POST',
@@ -454,9 +458,9 @@ export default function Home() {
       });
 
       if (res.ok) {
-        alert('성공적으로 견적 요청이 접수되었습니다!\n원장님이 그리신 도면을 바탕으로 제휴 인테리어 및 기구 업체가 최적의 견적서를 곧 발송해 드립니다.');
         setShowQuoteModal(false);
         setQuoteForm({ name: '', phone: '', email: '', region: '', expectedDate: '미정' });
+        setShowSuccessModal(true);
       } else {
         alert('견적 요청 중 오류가 발생했습니다. 다시 시도해 주세요.');
       }
@@ -1560,6 +1564,58 @@ export default function Home() {
               </button>
             </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Quote Success Modal */}
+      {showSuccessModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.6)',
+          zIndex: 300,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backdropFilter: 'blur(4px)'
+        }}>
+          <div style={{
+            background: 'white',
+            padding: '32px',
+            borderRadius: '16px',
+            width: '400px',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              width: '64px', height: '64px', background: '#dcfce7', borderRadius: '50%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto'
+            }}>
+              <span style={{ fontSize: '32px' }}>✅</span>
+            </div>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#111827', marginBottom: '12px' }}>
+              견적 요청이 접수되었습니다!
+            </h2>
+            <p style={{ fontSize: '14px', color: '#4b5563', marginBottom: '24px', lineHeight: 1.6 }}>
+              원장님이 직접 그리신 도면을 바탕으로<br />
+              제휴 인테리어 및 기구 업체가<br />
+              <strong>최적의 비교 견적서</strong>를 곧 발송해 드립니다.
+            </p>
+            <div style={{ background: '#f3f4f6', padding: '16px', borderRadius: '8px', marginBottom: '24px' }}>
+              <p style={{ fontSize: '13px', color: '#374151', margin: 0 }}>
+                💡 도착한 견적서는 <b>우측 상단 '내 견적함'</b>에서<br />확인하실 수 있습니다.
+              </p>
+            </div>
+            <button
+              onClick={() => setShowSuccessModal(false)}
+              style={{
+                width: '100%', background: '#10b981', color: 'white', border: 'none',
+                padding: '14px', borderRadius: '8px', fontWeight: 700, fontSize: '1rem', cursor: 'pointer'
+              }}
+            >
+              확인
+            </button>
           </div>
         </div>
       )}
