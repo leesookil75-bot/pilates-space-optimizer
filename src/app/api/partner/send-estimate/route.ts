@@ -66,12 +66,22 @@ export async function POST(req: Request) {
     
     const bucket = admin.storage().bucket(process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET);
     const fileRef = bucket.file(fileName);
+    // Inject a Firebase download token to bypass rules for read access (like Web SDK)
+    const crypto = require('crypto');
+    const downloadToken = crypto.randomUUID();
+    
     await fileRef.save(buffer, {
-      metadata: { contentType: file.type }
+      metadata: { 
+        contentType: file.type,
+        metadata: {
+          firebaseStorageDownloadTokens: downloadToken
+        }
+      }
     });
     
-    await fileRef.makePublic();
-    const fileUrl = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
+    // Construct the standard Firebase Storage download URL that relies on the token
+    const encodedFileName = encodeURIComponent(fileName);
+    const fileUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodedFileName}?alt=media&token=${downloadToken}`;
 
     // 4. Send email using Nodemailer (wrapped in try-catch so it doesn't block the main flow)
     try {
