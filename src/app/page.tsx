@@ -62,6 +62,7 @@ export default function Home() {
 
   // Quote Request Modal State
   const [showQuoteModal, setShowQuoteModal] = useState(false);
+  const [isSubmittingQuote, setIsSubmittingQuote] = useState(false);
   const [quoteForm, setQuoteForm] = useState({
     name: '',
     phone: '',
@@ -437,6 +438,10 @@ export default function Home() {
       return;
     }
 
+    if (isSubmittingQuote) return;
+
+    setIsSubmittingQuote(true);
+
     try {
       const res = await fetch('/api/quotes', {
         method: 'POST',
@@ -458,6 +463,8 @@ export default function Home() {
     } catch (error) {
       console.error(error);
       alert('서버와 통신할 수 없습니다.');
+    } finally {
+      setIsSubmittingQuote(false);
     }
   };
 
@@ -1520,20 +1527,36 @@ export default function Home() {
 
               <button 
                 type="submit"
+                disabled={isSubmittingQuote}
                 style={{
                   width: '100%',
-                  background: '#f97316',
+                  background: isSubmittingQuote ? '#fdba74' : '#f97316',
                   color: 'white',
                   border: 'none',
                   padding: '14px',
                   borderRadius: '8px',
                   fontWeight: 700,
                   fontSize: '1rem',
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 6px -1px rgba(249, 115, 22, 0.2)'
+                  cursor: isSubmittingQuote ? 'not-allowed' : 'pointer',
+                  boxShadow: isSubmittingQuote ? 'none' : '0 4px 6px -1px rgba(249, 115, 22, 0.2)',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
                 }}
               >
-                도면 전송 및 무료 견적 받기
+                {isSubmittingQuote ? (
+                  <>
+                    <div style={{
+                      width: '20px', height: '20px', border: '3px solid rgba(255,255,255,0.3)', 
+                      borderTop: '3px solid white', borderRadius: '50%', animation: 'spin 1s linear infinite'
+                    }} />
+                    <span>도면을 안전하게 전송하고 있습니다...</span>
+                  </>
+                ) : (
+                  '도면 전송 및 무료 견적 받기'
+                )}
               </button>
             </form>
             )}
