@@ -359,59 +359,171 @@ function FloorPlan({ room, allRooms = [], hasInnerRooms = false, onChange, scale
           cy /= localPoints.length;
         }
 
+        // --- TIER 1 & 2: OUTER ROOM SEGMENTED DIMENSIONS ---
+        if (isOuter) {
+          const dimensionGroups: any[] = [];
+          
+          localPoints.forEach((p1, i) => {
+            const p2 = localPoints[(i + 1) % localPoints.length];
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const L = Math.hypot(dx, dy);
+            if (L < 10) return;
+            
+            const distanceCm = Math.round(L * 2);
+            const ux = dx / L;
+            const uy = dy / L;
+            let nx = uy;
+            let ny = -ux;
+            
+            const mx = (p1.x + p2.x) / 2;
+            const my = (p1.y + p2.y) / 2;
+            const vx = mx - cx;
+            const vy = my - cy;
+            if (nx * vx + ny * vy < 0) {
+              nx = -nx;
+              ny = -ny;
+            }
+            
+            let angle = Math.atan2(dy, dx) * (180 / Math.PI);
+            angle = (angle % 180 + 180) % 180;
+            
+            // Tier 2: Overall Dimension (Offset 65)
+            // Deduplicate Tier 2: Only show Top and Right (or equivalent based on outward score)
+            let isTier2Valid = true;
+            for (let j = 0; j < i; j++) {
+              const op1 = localPoints[j];
+              const op2 = localPoints[(j + 1) % localPoints.length];
+              const odx = op2.x - op1.x;
+              const ody = op2.y - op1.y;
+              const oL = Math.hypot(odx, ody);
+              if (Math.abs(L - oL) < 1) {
+                let oAngle = Math.atan2(ody, odx) * (180 / Math.PI);
+                oAngle = (oAngle % 180 + 180) % 180;
+                if (Math.abs(angle - oAngle) < 1) {
+                  // For the outer room, centroid is the same, so outward scores are symmetric.
+                  isTier2Valid = false;
+                  break;
+                }
+              }
+            }
+            
+            if (isTier2Valid) {
+              const offset2 = 65 / scale;
+              const dimStartX = p1.x + nx * offset2;
+              const dimStartY = p1.y + ny * offset2;
+              const dimEndX = p2.x + nx * offset2;
+              const dimEndY = p2.y + ny * offset2;
+              
+              dimensionGroups.push(
+                <Group key={`dim-outer-t2-${i}`} listening={false}>
+                  <Line points={[p1.x + nx * (45/scale), p1.y + ny * (45/scale), p1.x + nx * (offset2 + 10/scale), p1.y + ny * (offset2 + 10/scale)]} stroke="#9ca3af" strokeWidth={1/scale} />
+                  <Line points={[p2.x + nx * (45/scale), p2.y + ny * (45/scale), p2.x + nx * (offset2 + 10/scale), p2.y + ny * (offset2 + 10/scale)]} stroke="#9ca3af" strokeWidth={1/scale} />
+                  <Arrow points={[dimStartX, dimStartY, dimEndX, dimEndY]} stroke="#6b7280" strokeWidth={2/scale} fill="#6b7280" pointerAtBeginning={true} pointerLength={8/scale} pointerWidth={8/scale} />
+                  <Text x={(dimStartX+dimEndX)/2} y={(dimStartY+dimEndY)/2} width={200/scale} offsetX={100/scale} offsetY={7/scale} text={`전체 | ${distanceCm.toLocaleString()} cm`} fontSize={14/scale} fontStyle="bold" fill="#1f2937" stroke="white" strokeWidth={8/scale} fillAfterStrokeEnabled={true} align="center" rotation={angle} />
+                </Group>
+              );
+            }
+            
+            // Tier 1: Segmented Dimensions (Offset 35)
+            // Collect projection points from all inner rooms
+            const tValues = [0, 1]; // p1 is 0, p2 is 1
+            for (const other of allRooms) {
+              if (other.type === 'outer') continue;
+              for (const q of other.points) {
+                // Perpendicular distance from q to line p1-p2
+                const cross = (q.y - p1.y) * dx - (q.x - p1.x) * dy;
+                const distance = Math.abs(cross) / L;
+                if (distance < 5) { // Slack for snapping tolerance (5 pixels)
+                  const dot = (q.x - p1.x) * dx + (q.y - p1.y) * dy;
+                  const t = dot / (L * L);
+                  if (t > 0.005 && t < 0.995) {
+                    tValues.push(t);
+                  }
+                }
+              }
+            }
+            
+            tValues.sort((a, b) => a - b);
+            // Remove duplicates
+            const uniqueT: number[] = [];
+            for (let k = 0; k < tValues.length; k++) {
+              if (k === 0 || (tValues[k] - uniqueT[uniqueT.length - 1]) * L > 5) {
+                uniqueT.push(tValues[k]);
+              }
+            }
+            
+            // Draw sub-segments
+            const offset1 = 35 / scale;
+            for (let k = 0; k < uniqueT.length - 1; k++) {
+              const tStart = uniqueT[k];
+              const tEnd = uniqueT[k+1];
+              const subL = (tEnd - tStart) * L;
+              if (subL < 5) continue; // Too small
+              
+              const subCm = Math.round(subL * 2);
+              const sp1x = p1.x + tStart * dx;
+              const sp1y = p1.y + tStart * dy;
+              const sp2x = p1.x + tEnd * dx;
+              const sp2y = p1.y + tEnd * dy;
+              
+              const dimStartX = sp1x + nx * offset1;
+              const dimStartY = sp1y + ny * offset1;
+              const dimEndX = sp2x + nx * offset1;
+              const dimEndY = sp2y + ny * offset1;
+              
+              dimensionGroups.push(
+                <Group key={`dim-outer-t1-${i}-${k}`} listening={false}>
+                  <Line points={[sp1x + nx * (10/scale), sp1y + ny * (10/scale), sp1x + nx * (offset1 + 10/scale), sp1y + ny * (offset1 + 10/scale)]} stroke="#9ca3af" strokeWidth={1/scale} />
+                  <Line points={[sp2x + nx * (10/scale), sp2y + ny * (10/scale), sp2x + nx * (offset1 + 10/scale), sp2y + ny * (offset1 + 10/scale)]} stroke="#9ca3af" strokeWidth={1/scale} />
+                  <Arrow points={[dimStartX, dimStartY, dimEndX, dimEndY]} stroke="#9ca3af" strokeWidth={1.5/scale} fill="#9ca3af" pointerAtBeginning={true} pointerLength={6/scale} pointerWidth={6/scale} />
+                  <Text x={(dimStartX+dimEndX)/2} y={(dimStartY+dimEndY)/2} width={200/scale} offsetX={100/scale} offsetY={6/scale} text={`${subCm.toLocaleString()} cm`} fontSize={12/scale} fontStyle="bold" fill="#374151" stroke="white" strokeWidth={8/scale} fillAfterStrokeEnabled={true} align="center" rotation={angle} />
+                </Group>
+              );
+            }
+          });
+          
+          return dimensionGroups;
+        }
+
+        // --- INNER ROOM DIMENSIONS ---
         return localPoints.map((p1, i) => {
           const p2 = localPoints[(i + 1) % localPoints.length];
           const dx = p2.x - p1.x;
           const dy = p2.y - p1.y;
           const L = Math.hypot(dx, dy);
           
-          if (L < 10) return null; // Avoid division by zero or cluttered small dimensions
+          if (L < 10) return null;
 
           const distanceCm = Math.round(L * 2);
-          
-          // Unit vector
           const ux = dx / L;
           const uy = dy / L;
-
-          // Normal vector initially
           let nx = uy;
           let ny = -ux;
 
-          // Midpoint of segment
           const mx = (p1.x + p2.x) / 2;
           const my = (p1.y + p2.y) / 2;
-
-          // Vector from centroid to midpoint
           const vx = mx - cx;
           const vy = my - cy;
-
-          // Dot product to check if normal points outward from centroid
-          // For perfectly symmetric shapes, centroid to midpoint is exactly the outward normal
           if (nx * vx + ny * vy < 0) {
             nx = -nx;
             ny = -ny;
           }
 
-          // Tiered dimension lines: Inner rooms' dimensions are drawn closer to the wall
-          // so they don't overlap with the outer wall's dimensions.
-          const offsetDist = isOuter ? 55 / scale : 35 / scale;
+          const offsetDist = 35 / scale;
           const overshoot = 10 / scale;
 
-          // Dimension line start/end
           const dimStartX = p1.x + nx * offsetDist;
           const dimStartY = p1.y + ny * offsetDist;
           const dimEndX = p2.x + nx * offsetDist;
           const dimEndY = p2.y + ny * offsetDist;
 
-          // Midpoint for text
           const dimMidX = (dimStartX + dimEndX) / 2;
           const dimMidY = (dimStartY + dimEndY) / 2;
 
           let angle = Math.atan2(dy, dx) * (180 / Math.PI);
-          // Normalize angle to [0, 180) to correctly match parallel lines regardless of their drawing direction
           angle = (angle % 180 + 180) % 180;
 
-          // Find outer room centroid to determine "inside vs outside" for deduplication
           let outerCx = cx, outerCy = cy;
           const outerRoom = allRooms.find(r => r.type === 'outer');
           if (outerRoom && outerRoom.points.length > 0) {
@@ -421,9 +533,7 @@ function FloorPlan({ room, allRooms = [], hasInnerRooms = false, onChange, scale
             outerCy /= outerRoom.points.length;
           }
 
-          // Calculate "outwardness" score relative to the overall layout center
           const outwardScore = nx * (mx - outerCx) + ny * (my - outerCy);
-
           const EPSILON = 1;
           let shouldDrawDimension = true;
           
@@ -441,7 +551,6 @@ function FloorPlan({ room, allRooms = [], hasInnerRooms = false, onChange, scale
               oAngle = (oAngle % 180 + 180) % 180;
               
               if (Math.abs(angle - oAngle) < EPSILON) {
-                // Calculate its normal
                 const oux = odx / oL;
                 const ouy = ody / oL;
                 let onx = ouy;
@@ -454,8 +563,6 @@ function FloorPlan({ room, allRooms = [], hasInnerRooms = false, onChange, scale
                 }
                 const oOutwardScore = onx * (omx - outerCx) + ony * (omy - outerCy);
                 
-                // If the other edge has a better outward score, we skip this one
-                // If scores are very close, use index as tie-breaker
                 if (oOutwardScore > outwardScore + EPSILON) {
                   shouldDrawDimension = false;
                   break;
@@ -467,29 +574,35 @@ function FloorPlan({ room, allRooms = [], hasInnerRooms = false, onChange, scale
             }
           }
 
-          // Deduplication 2: Check if any other INNER room has an identical segment
-          if (shouldDrawDimension && !isOuter) {
+          // Deduplication 2: Check overlap with OTHER rooms
+          if (shouldDrawDimension) {
             for (const other of allRooms) {
-              if (other.id === room.id || other.type === 'outer') continue;
+              if (other.id === room.id) continue;
               
               let hasOverlap = false;
               const op = other.points;
               for (let j = 0; j < op.length; j++) {
                 const q1 = op[j];
                 const q2 = op[(j + 1) % op.length];
-                
                 const matchForward = Math.hypot(p1.x - q1.x, p1.y - q1.y) < EPSILON && Math.hypot(p2.x - q2.x, p2.y - q2.y) < EPSILON;
                 const matchReverse = Math.hypot(p1.x - q2.x, p1.y - q2.y) < EPSILON && Math.hypot(p2.x - q1.x, p2.y - q1.y) < EPSILON;
-                
                 if (matchForward || matchReverse) {
                   hasOverlap = true;
                   break;
                 }
               }
               
-              if (hasOverlap && other.id < room.id) {
-                shouldDrawDimension = false;
-                break;
+              if (hasOverlap) {
+                // If the inner room overlaps with OUTER room, hide it!
+                // Because Outer Room Tier 1 segmented dimensions will draw it exactly.
+                if (other.type === 'outer') {
+                  shouldDrawDimension = false;
+                  break;
+                } else if (other.id < room.id) {
+                  // Tie-breaker for overlapping inner rooms
+                  shouldDrawDimension = false;
+                  break;
+                }
               }
             }
           }
@@ -498,51 +611,10 @@ function FloorPlan({ room, allRooms = [], hasInnerRooms = false, onChange, scale
 
           return (
             <Group key={`dim-${i}`} listening={false}>
-              {/* Extension Line 1 */}
-              <Line
-                points={[
-                  p1.x + nx * (10 / scale), p1.y + ny * (10 / scale), // Start slightly off the wall
-                  p1.x + nx * (offsetDist + overshoot), p1.y + ny * (offsetDist + overshoot)
-                ]}
-                stroke="#9ca3af" // gray-400
-                strokeWidth={1 / scale}
-              />
-              {/* Extension Line 2 */}
-              <Line
-                points={[
-                  p2.x + nx * (10 / scale), p2.y + ny * (10 / scale),
-                  p2.x + nx * (offsetDist + overshoot), p2.y + ny * (offsetDist + overshoot)
-                ]}
-                stroke="#9ca3af" // gray-400
-                strokeWidth={1 / scale}
-              />
-              {/* Dimension Line with Arrows */}
-              <Arrow
-                points={[dimStartX, dimStartY, dimEndX, dimEndY]}
-                stroke="#9ca3af"
-                strokeWidth={1.5 / scale}
-                fill="#9ca3af"
-                pointerAtBeginning={true}
-                pointerLength={6 / scale}
-                pointerWidth={6 / scale}
-              />
-              {/* Centered Dimension Text with White Halo */}
-              <Text
-                x={dimMidX}
-                y={dimMidY}
-                width={200 / scale}
-                offsetX={100 / scale}
-                offsetY={6 / scale} // Vertically center text over the dimension line
-                text={`${distanceCm.toLocaleString()} cm`}
-                fontSize={12 / scale}
-                fontStyle="bold"
-                fill="#374151" // gray-700
-                stroke="white"
-                strokeWidth={8 / scale} // Thick white stroke creates a background break in the arrow line
-                fillAfterStrokeEnabled={true}
-                align="center"
-                rotation={angle}
-              />
+              <Line points={[p1.x + nx * (10/scale), p1.y + ny * (10/scale), p1.x + nx * (offsetDist + overshoot), p1.y + ny * (offsetDist + overshoot)]} stroke="#9ca3af" strokeWidth={1/scale} />
+              <Line points={[p2.x + nx * (10/scale), p2.y + ny * (10/scale), p2.x + nx * (offsetDist + overshoot), p2.y + ny * (offsetDist + overshoot)]} stroke="#9ca3af" strokeWidth={1/scale} />
+              <Arrow points={[dimStartX, dimStartY, dimEndX, dimEndY]} stroke="#9ca3af" strokeWidth={1.5/scale} fill="#9ca3af" pointerAtBeginning={true} pointerLength={6/scale} pointerWidth={6/scale} />
+              <Text x={dimMidX} y={dimMidY} width={200/scale} offsetX={100/scale} offsetY={6/scale} text={`${distanceCm.toLocaleString()} cm`} fontSize={12/scale} fontStyle="bold" fill="#374151" stroke="white" strokeWidth={8/scale} fillAfterStrokeEnabled={true} align="center" rotation={angle} />
             </Group>
           );
         });
