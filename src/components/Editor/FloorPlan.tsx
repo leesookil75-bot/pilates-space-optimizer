@@ -179,103 +179,66 @@ function FloorPlan({ room, allRooms = [], hasInnerRooms = false, onChange, scale
         let finalDx = snapToGrid(relativePos.x, scale);
         let finalDy = snapToGrid(relativePos.y, scale);
         
-        const SNAP_THRESHOLD = 15 / scale;
+        // Increased threshold slightly for a better magnetic "feel"
+        const SNAP_THRESHOLD = 20 / scale;
         
-        let bestPointDist = Infinity;
-        let snappedPoint = false;
-        
-        let bestLineDistX = Infinity;
-        let bestLineDistY = Infinity;
-        let snappedLineX = false;
-        let snappedLineY = false;
-        let snapDx = relativePos.x;
-        let snapDy = relativePos.y;
-
-        const myPoints = localPoints;
+        // 1. Extract all target X and Y coordinates (Infinite Guide Lines)
+        const targetXs = new Set<number>();
+        const targetYs = new Set<number>();
         
         for (const otherRoom of allRooms) {
           if (otherRoom.id === room.id) continue;
-          
-          for (let i = 0; i < myPoints.length; i++) {
-            const mp = myPoints[i];
-            const myCurrentX = mp.x + relativePos.x;
-            const myCurrentY = mp.y + relativePos.y;
-            
-            for (let j = 0; j < otherRoom.points.length; j++) {
-              const tp1 = otherRoom.points[j];
-              const tp2 = otherRoom.points[(j + 1) % otherRoom.points.length];
-              
-              // 1. Point-to-Point Snap
-              const distToPoint = Math.hypot(myCurrentX - tp1.x, myCurrentY - tp1.y);
-              if (distToPoint < SNAP_THRESHOLD && distToPoint < bestPointDist) {
-                bestPointDist = distToPoint;
-                finalDx = tp1.x - mp.x;
-                finalDy = tp1.y - mp.y;
-                snappedPoint = true;
-              }
-              
-              // 2. Point-to-Line Snap
-              if (!snappedPoint) {
-                const closest = getClosestPointOnSegment({x: myCurrentX, y: myCurrentY}, tp1, tp2);
-                if (closest.dist < SNAP_THRESHOLD) {
-                  // Vertical target line
-                  if (Math.abs(tp1.x - tp2.x) < 1 && closest.dist < bestLineDistX) {
-                    bestLineDistX = closest.dist;
-                    snapDx = tp1.x - mp.x;
-                    snappedLineX = true;
-                  } 
-                  // Horizontal target line
-                  else if (Math.abs(tp1.y - tp2.y) < 1 && closest.dist < bestLineDistY) {
-                    bestLineDistY = closest.dist;
-                    snapDy = tp1.y - mp.y;
-                    snappedLineY = true;
-                  }
-                }
-              }
-            }
+          for (const p of otherRoom.points) {
+            targetXs.add(p.x);
+            targetYs.add(p.y);
           }
         }
         
-        // 3. Target point to My Line Snap
-        if (!snappedPoint) {
-          for (const otherRoom of allRooms) {
-            if (otherRoom.id === room.id) continue;
-            for (let j = 0; j < otherRoom.points.length; j++) {
-              const tp = otherRoom.points[j];
-              for (let i = 0; i < myPoints.length; i++) {
-                const mp1 = myPoints[i];
-                const mp2 = myPoints[(i + 1) % myPoints.length];
-                
-                const s1 = { x: mp1.x + relativePos.x, y: mp1.y + relativePos.y };
-                const s2 = { x: mp2.x + relativePos.x, y: mp2.y + relativePos.y };
-                
-                const closest = getClosestPointOnSegment(tp, s1, s2);
-                if (closest.dist < SNAP_THRESHOLD) {
-                  // My line is vertical
-                  if (Math.abs(s1.x - s2.x) < 1 && closest.dist < bestLineDistX) {
-                    bestLineDistX = closest.dist;
-                    snapDx = tp.x - mp1.x;
-                    snappedLineX = true;
-                  }
-                  // My line is horizontal
-                  else if (Math.abs(s1.y - s2.y) < 1 && closest.dist < bestLineDistY) {
-                    bestLineDistY = closest.dist;
-                    snapDy = tp.y - mp1.y;
-                    snappedLineY = true;
-                  }
-                }
-              }
+        // 2. Extract my room's X and Y coordinates (My Guide Lines)
+        const myXs = new Set<number>();
+        const myYs = new Set<number>();
+        for (const p of localPoints) {
+          myXs.add(p.x);
+          myYs.add(p.y);
+        }
+
+        // 3. Find the best X snap (Vertical lines alignment)
+        let bestDx = finalDx;
+        let bestDistX = Infinity;
+        let snappedX = false;
+        
+        for (const mx of Array.from(myXs)) {
+          const currentX = mx + relativePos.x;
+          for (const tx of Array.from(targetXs)) {
+            const dist = Math.abs(currentX - tx);
+            if (dist < SNAP_THRESHOLD && dist < bestDistX) {
+              bestDistX = dist;
+              bestDx = tx - mx;
+              snappedX = true;
             }
           }
         }
+        if (snappedX) finalDx = bestDx;
 
-        if (!snappedPoint) {
-          if (snappedLineX) finalDx = snapDx;
-          if (snappedLineY) finalDy = snapDy;
+        // 4. Find the best Y snap (Horizontal lines alignment)
+        let bestDy = finalDy;
+        let bestDistY = Infinity;
+        let snappedY = false;
+
+        for (const my of Array.from(myYs)) {
+          const currentY = my + relativePos.y;
+          for (const ty of Array.from(targetYs)) {
+            const dist = Math.abs(currentY - ty);
+            if (dist < SNAP_THRESHOLD && dist < bestDistY) {
+              bestDistY = dist;
+              bestDy = ty - my;
+              snappedY = true;
+            }
+          }
         }
+        if (snappedY) finalDy = bestDy;
 
-        const snappedRelative = { x: finalDx, y: finalDy };
-        return stage.getAbsoluteTransform().point(snappedRelative);
+        return stage.getAbsoluteTransform().point({ x: finalDx, y: finalDy });
       }}
     >
       {/* The main polygon shape */}
