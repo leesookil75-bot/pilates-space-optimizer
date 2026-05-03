@@ -277,16 +277,25 @@ export default function Home() {
       }
     }
 
+    let spawnX = 150;
+    let spawnY = 150;
+    const innerRooms = rooms.filter(r => r.type === 'inner');
+    if (innerRooms.length > 0) {
+      // Find the right-most point of all inner rooms to prevent overlapping
+      const maxRight = Math.max(...innerRooms.flatMap(r => r.points.map(p => p.x)));
+      spawnX = maxRight + 50; // 50px gap
+    }
+
     const roomId = `inner-${Date.now()}`;
     const newRoom: RoomData = {
       id: roomId,
       name: newRoomParams.name || `룸 ${rooms.length}`,
       type: 'inner',
       points: [
-        { x: 150, y: 150 },
-        { x: 150 + w * 50, y: 150 },
-        { x: 150 + w * 50, y: 150 + h * 50 },
-        { x: 150, y: 150 + h * 50 },
+        { x: spawnX, y: spawnY },
+        { x: spawnX + w * 50, y: spawnY },
+        { x: spawnX + w * 50, y: spawnY + h * 50 },
+        { x: spawnX, y: spawnY + h * 50 },
       ],
       colorTheme: '#a855f7' // Purple
     };
@@ -301,8 +310,8 @@ export default function Home() {
       const cols = Math.ceil(Math.sqrt(qty));
       const rows = Math.ceil(qty / cols);
       
-      const minX = 150;
-      const minY = 150;
+      const minX = spawnX;
+      const minY = spawnY;
       // Start center position so the gray area touches the wall exactly
       const startX = minX + reqW / 2;
       const startY = minY + reqH / 2;

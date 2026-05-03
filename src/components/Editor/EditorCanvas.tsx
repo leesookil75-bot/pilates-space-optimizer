@@ -85,7 +85,11 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
     initialRoomPointsRef.current = [...room.points];
     draggingRoomIndexRef.current = index;
     const inRoomIds = equipments
-      .filter((eq) => isPointInPolygon({ x: eq.x, y: eq.y }, room.points))
+      .filter((eq) => {
+        // Strict Drag Ownership: Do not kidnap equipments that belong to another room
+        if (eq.linkedRoomId && eq.linkedRoomId !== room.id) return false;
+        return isPointInPolygon({ x: eq.x, y: eq.y }, room.points);
+      })
       .map((eq) => eq.id);
     draggingEquipmentsRef.current = inRoomIds;
   };
