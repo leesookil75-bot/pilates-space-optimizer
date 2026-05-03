@@ -523,8 +523,9 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
               let iconStr = '';
               if (room.isLocked) iconStr = '🔒 ';
 
-              let tagFill = room.id === selectedId ? '#eff6ff' : 'rgba(255,255,255,0.9)';
-              let tagStroke = room.id === selectedId ? '#3b82f6' : '#d1d5db';
+              const colorTheme = room.colorTheme || '#a855f7';
+              let tagFill = room.id === selectedId ? `${colorTheme}1A` : 'rgba(255,255,255,0.9)'; // 10% opacity
+              let tagStroke = room.id === selectedId ? colorTheme : '#d1d5db';
               let tagStrokeWidth = room.id === selectedId ? 2 : 1;
 
               return (

@@ -248,12 +248,12 @@ function FloorPlan({ room, allRooms = [], hasInnerRooms = false, onChange, scale
           <Line
             points={flatPoints}
             closed
-            fill={showHighlight ? `${colorTheme}66` : fillColor}
-            stroke={showHighlight ? '#2563eb' : strokeColor}
-            strokeWidth={(showHighlight ? 8 : 4) / scale}
-            shadowColor={showHighlight ? '#2563eb' : undefined}
-            shadowBlur={showHighlight ? 20 : 0}
-            shadowOpacity={0.8}
+            fill={showHighlight ? `${colorTheme}4D` : fillColor} // 30% opacity when selected
+            stroke={strokeColor} // Keep the original color
+            strokeWidth={(showHighlight ? 6 : 4) / scale} // Just slightly thicker
+            shadowColor={showHighlight ? colorTheme : undefined}
+            shadowBlur={showHighlight ? 15 : 0}
+            shadowOpacity={0.6}
             dash={isMovingRoom ? [15 / scale, 10 / scale] : undefined}
             lineJoin="round"
         perfectDrawEnabled={false}
