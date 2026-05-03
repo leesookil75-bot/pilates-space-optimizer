@@ -1068,8 +1068,11 @@ export default function Home() {
                     <label style={{ display: 'block', fontSize: '12px', color: '#4b5563', marginBottom: '4px' }}>가로 (cm)</label>
                     <input 
                       type="number" 
-                      value={Math.round((selectedEquipment.width || EQUIPMENT_DIMS[selectedEquipment.type].width) * 2)}
-                      onChange={(e) => handleEquipmentDimensionChange('width', Number(e.target.value))}
+                      value={selectedEquipment.width === 0 ? '' : Math.round((selectedEquipment.width ?? EQUIPMENT_DIMS[selectedEquipment.type].width) * 2)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        handleEquipmentDimensionChange('width', val === '' ? 0 : Number(val));
+                      }}
                       style={{ width: '100%', padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '14px', boxSizing: 'border-box' }}
                     />
                   </div>
@@ -1077,8 +1080,11 @@ export default function Home() {
                     <label style={{ display: 'block', fontSize: '12px', color: '#4b5563', marginBottom: '4px' }}>세로 (cm)</label>
                     <input 
                       type="number" 
-                      value={Math.round((selectedEquipment.height || EQUIPMENT_DIMS[selectedEquipment.type].height) * 2)}
-                      onChange={(e) => handleEquipmentDimensionChange('height', Number(e.target.value))}
+                      value={selectedEquipment.height === 0 ? '' : Math.round((selectedEquipment.height ?? EQUIPMENT_DIMS[selectedEquipment.type].height) * 2)}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        handleEquipmentDimensionChange('height', val === '' ? 0 : Number(val));
+                      }}
                       style={{ width: '100%', padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '14px', boxSizing: 'border-box' }}
                     />
                   </div>
@@ -1087,8 +1093,11 @@ export default function Home() {
                   <label style={{ display: 'block', fontSize: '12px', color: '#4b5563', marginBottom: '4px' }}>여유 공간 (cm)</label>
                   <input 
                     type="number" 
-                    value={selectedEquipment.clearance ?? 40}
-                    onChange={(e) => handleEquipmentDimensionChange('clearance', Number(e.target.value))}
+                    value={selectedEquipment.clearance === -1 ? '' : (selectedEquipment.clearance ?? 40)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      handleEquipmentDimensionChange('clearance', val === '' ? -1 : Number(val));
+                    }}
                     style={{ width: '100%', padding: '6px 8px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '14px', boxSizing: 'border-box' }}
                   />
                 </div>
