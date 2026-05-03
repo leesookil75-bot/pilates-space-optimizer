@@ -39,7 +39,7 @@ const getClosestPointOnSegment = (p: {x:number, y:number}, v: {x:number, y:numbe
   return { ...proj, dist: Math.hypot(p.x - proj.x, p.y - proj.y) };
 };
 
-function FloorPlan({ room, allRooms = [], hasInnerRooms = false, onChange, scale, readOnly = false, onDragStart, onDragMove, onDragEnd, isMovingRoom = false, onSelect, isSelected = false }: FloorPlanProps) {
+function FloorPlan({ room, allRooms = [], hasInnerRooms: _hasInnerRooms = false, onChange, scale, readOnly = false, onDragStart, onDragMove, onDragEnd, isMovingRoom = false, onSelect, isSelected = false }: FloorPlanProps) {
   const points = room.points;
   const isOuter = room.type === 'outer';
   const colorTheme = room.colorTheme;
@@ -362,6 +362,7 @@ function FloorPlan({ room, allRooms = [], hasInnerRooms = false, onChange, scale
         // --- TIER 1 & 2: OUTER ROOM SEGMENTED DIMENSIONS ---
         if (isOuter) {
           const dimensionGroups: any[] = [];
+          const shownTier1Sizes = new Set<number>();
           
           localPoints.forEach((p1, i) => {
             const p2 = localPoints[(i + 1) % localPoints.length];
@@ -460,8 +461,10 @@ function FloorPlan({ room, allRooms = [], hasInnerRooms = false, onChange, scale
               const tEnd = uniqueT[k+1];
               const subL = (tEnd - tStart) * L;
               if (subL < 5) continue; // Too small
-              
+
               const subCm = Math.round(subL * 2);
+              if (shownTier1Sizes.has(subCm)) continue;
+              shownTier1Sizes.add(subCm);
               const sp1x = p1.x + tStart * dx;
               const sp1y = p1.y + tStart * dy;
               const sp2x = p1.x + tEnd * dx;
@@ -487,6 +490,7 @@ function FloorPlan({ room, allRooms = [], hasInnerRooms = false, onChange, scale
         }
 
         // --- INNER ROOM DIMENSIONS ---
+        const shownInnerSizes = new Set<number>();
         return localPoints.map((p1, i) => {
           const p2 = localPoints[(i + 1) % localPoints.length];
           const dx = p2.x - p1.x;
@@ -631,6 +635,8 @@ function FloorPlan({ room, allRooms = [], hasInnerRooms = false, onChange, scale
           }
 
           if (!shouldDrawDimension) return null;
+          if (shownInnerSizes.has(distanceCm)) return null;
+          shownInnerSizes.add(distanceCm);
 
           return (
             <Group key={`dim-${i}`} listening={false}>
