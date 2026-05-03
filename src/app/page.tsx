@@ -97,6 +97,16 @@ export default function Home() {
     quantity: 1
   });
 
+  const [showRoiModal, setShowRoiModal] = useState(false);
+  const [roiParams, setRoiParams] = useState({
+    privatePrice: 80000,
+    privateSessionsPerDay: 5,
+    privateEquipmentCount: 3,
+    groupPrice: 20000,
+    groupSessionsPerDay: 5,
+    operatingDaysPerMonth: 20
+  });
+
   const editorRef = useRef<EditorCanvasHandle>(null);
 
   // Load from LocalStorage on mount
@@ -536,11 +546,14 @@ export default function Home() {
   const privateRoomCount = rooms.filter(r => r.name.includes('개인')).length;
   // 전체 배치된 그룹 기구 카운트 (커스텀/출입문/캐딜락 제외)
   const groupEqCount = equipments.filter(e => !['Custom', 'Door', 'Cadillac'].includes(e.type)).length;
-  // 개인룸 하나당 3개(리포머, 체어, 바렐)의 기구를 소진한다고 가정
-  const estimatedGroupCapacity = Math.max(0, groupEqCount - (privateRoomCount * 3));
   
-  // 예상 월 최대 매출액 (개인 8만*5회*20일=800만, 그룹 2만*5회*20일=200만)
-  const maxRevenueMonthly = (privateRoomCount * 8000000) + (estimatedGroupCapacity * 2000000);
+  // 개인룸 하나당 소모되는 기구 수 (사용자 설정 가능, 기본 3대)
+  const estimatedGroupCapacity = Math.max(0, groupEqCount - (privateRoomCount * roiParams.privateEquipmentCount));
+  
+  // 예상 월 최대 매출액 계산 (동적 파라미터 적용)
+  const privateMonthlyRevenue = privateRoomCount * roiParams.privatePrice * roiParams.privateSessionsPerDay * roiParams.operatingDaysPerMonth;
+  const groupMonthlyRevenue = estimatedGroupCapacity * roiParams.groupPrice * roiParams.groupSessionsPerDay * roiParams.operatingDaysPerMonth;
+  const maxRevenueMonthly = privateMonthlyRevenue + groupMonthlyRevenue;
 
   // Keyboard shortcuts for Delete/Backspace
   useEffect(() => {
@@ -835,13 +848,16 @@ export default function Home() {
             </div>
 
             <div style={{ background: 'white', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-              <span style={{ fontSize: '11px', color: '#64748b', display: 'block', marginBottom: '4px' }}>예상 월 최대 매출 (풀타임 가동시)</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>예상 월 최대 매출 (풀타임 가동시)</span>
+                <button onClick={() => setShowRoiModal(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', padding: 0 }} title="ROI 조건 설정">⚙️</button>
+              </div>
               <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>
                 ₩{maxRevenueMonthly.toLocaleString()}
               </div>
               <p style={{ fontSize: '10px', color: '#94a3b8', margin: '4px 0 0 0', lineHeight: 1.3 }}>
                 * 개인룸 {privateRoomCount}개, 그룹기구 {estimatedGroupCapacity}대 기준<br/>
-                (업계 평균 객단가 및 주 5일 5타임 추정치)
+                (설정된 예상 단가 및 가동 횟수 기준)
               </p>
             </div>
           </div>
@@ -1369,6 +1385,136 @@ export default function Home() {
               </button>
             </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ROI Settings Modal */}
+      {showRoiModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.6)', zIndex: 300,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          backdropFilter: 'blur(4px)'
+        }}>
+          <div style={{
+            background: 'white', padding: '32px', borderRadius: '16px',
+            width: '450px', maxHeight: '90vh', overflowY: 'auto',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+          }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#111827', marginBottom: '8px', display: 'flex', justifyContent: 'space-between' }}>
+              <span>⚙️ 실시간 ROI 시뮬레이션 설정</span>
+              <button onClick={() => setShowRoiModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', color: '#9ca3af' }}>&times;</button>
+            </h2>
+            <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '24px', lineHeight: 1.5 }}>
+              우리 센터의 상황에 맞게 예상 객단가와 회전율을 조절하여 정확한 수익성을 분석해 보세요. (변경 즉시 좌측 패널에 반영됩니다.)
+            </p>
+
+            {/* 1:1 개인 레슨 설정 */}
+            <div style={{ marginBottom: '24px', background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#334155', marginBottom: '16px', borderBottom: '1px solid #cbd5e1', paddingBottom: '8px' }}>1:1 개인 레슨 설정</h3>
+              
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '13px', color: '#475569', fontWeight: 600 }}>예상 객단가 (회당)</label>
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{roiParams.privatePrice.toLocaleString()}원</span>
+                </div>
+                <input 
+                  type="range" min="30000" max="150000" step="5000"
+                  value={roiParams.privatePrice} 
+                  onChange={e => setRoiParams({...roiParams, privatePrice: Number(e.target.value)})} 
+                  style={{ width: '100%', accentColor: '#3b82f6' }} 
+                />
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '13px', color: '#475569', fontWeight: 600 }}>일 평균 가동 횟수</label>
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{roiParams.privateSessionsPerDay}회</span>
+                </div>
+                <input 
+                  type="range" min="1" max="15" step="1"
+                  value={roiParams.privateSessionsPerDay} 
+                  onChange={e => setRoiParams({...roiParams, privateSessionsPerDay: Number(e.target.value)})} 
+                  style={{ width: '100%', accentColor: '#3b82f6' }} 
+                />
+              </div>
+
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '13px', color: '#475569', fontWeight: 600 }}>개인룸 1개당 소모 기구 수</label>
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{roiParams.privateEquipmentCount}대</span>
+                </div>
+                <p style={{ fontSize: '11px', color: '#64748b', marginBottom: '8px' }}>개인룸 하나에 보통 리포머, 바렐, 체어 등 몇 대의 기구를 넣을지 설정합니다.</p>
+                <input 
+                  type="range" min="1" max="5" step="1"
+                  value={roiParams.privateEquipmentCount} 
+                  onChange={e => setRoiParams({...roiParams, privateEquipmentCount: Number(e.target.value)})} 
+                  style={{ width: '100%', accentColor: '#3b82f6' }} 
+                />
+              </div>
+            </div>
+
+            {/* 그룹 레슨 설정 */}
+            <div style={{ marginBottom: '24px', background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#334155', marginBottom: '16px', borderBottom: '1px solid #cbd5e1', paddingBottom: '8px' }}>그룹 레슨 설정</h3>
+              
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '13px', color: '#475569', fontWeight: 600 }}>예상 객단가 (회당)</label>
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{roiParams.groupPrice.toLocaleString()}원</span>
+                </div>
+                <input 
+                  type="range" min="10000" max="50000" step="1000"
+                  value={roiParams.groupPrice} 
+                  onChange={e => setRoiParams({...roiParams, groupPrice: Number(e.target.value)})} 
+                  style={{ width: '100%', accentColor: '#10b981' }} 
+                />
+              </div>
+
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '13px', color: '#475569', fontWeight: 600 }}>일 평균 가동 횟수</label>
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{roiParams.groupSessionsPerDay}회</span>
+                </div>
+                <input 
+                  type="range" min="1" max="15" step="1"
+                  value={roiParams.groupSessionsPerDay} 
+                  onChange={e => setRoiParams({...roiParams, groupSessionsPerDay: Number(e.target.value)})} 
+                  style={{ width: '100%', accentColor: '#10b981' }} 
+                />
+              </div>
+            </div>
+
+            {/* 공통 설정 */}
+            <div style={{ marginBottom: '24px', background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#334155', marginBottom: '16px', borderBottom: '1px solid #cbd5e1', paddingBottom: '8px' }}>공통 운영 설정</h3>
+              
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '13px', color: '#475569', fontWeight: 600 }}>월 평균 영업일 수</label>
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{roiParams.operatingDaysPerMonth}일</span>
+                </div>
+                <input 
+                  type="range" min="15" max="30" step="1"
+                  value={roiParams.operatingDaysPerMonth} 
+                  onChange={e => setRoiParams({...roiParams, operatingDaysPerMonth: Number(e.target.value)})} 
+                  style={{ width: '100%', accentColor: '#8b5cf6' }} 
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowRoiModal(false)}
+              style={{
+                width: '100%',
+                background: '#111827',
+                color: 'white', border: 'none', padding: '14px', borderRadius: '8px',
+                fontWeight: 700, fontSize: '1rem', cursor: 'pointer',
+              }}
+            >
+              닫기
+            </button>
           </div>
         </div>
       )}
