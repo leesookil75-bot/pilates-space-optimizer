@@ -42,6 +42,10 @@ export default function Home() {
   const [equipments, setEquipments] = useState<EquipmentData[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [movingRoomId, setMovingRoomId] = useState<string | null>(null);
+  
+  // Smart Clipboard State
+  const [copiedEqId, setCopiedEqId] = useState<string | null>(null);
+  const mousePosRef = useRef<Point | null>(null);
 
   // History state for Undo/Redo
   const [historyState, setHistoryState] = useState<{ list: AppState[], index: number }>({ list: [], index: -1 });
@@ -555,38 +559,104 @@ export default function Home() {
   const groupMonthlyRevenue = estimatedGroupCapacity * roiParams.groupPrice * roiParams.groupSessionsPerDay * roiParams.operatingDaysPerMonth;
   const maxRevenueMonthly = privateMonthlyRevenue + groupMonthlyRevenue;
 
-  // Keyboard shortcuts for Delete/Backspace
+  // Keyboard shortcuts for Delete/Backspace and Copy/Paste
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        // Prevent deleting if the user is typing in an input field
-        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-          return;
-        }
+      // Prevent handling if the user is typing in an input field
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
 
+      if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedId) {
-          // Check if selected is a room
           const targetRoom = latestStateRef.current.rooms.find(r => r.id === selectedId);
           if (targetRoom && targetRoom.type !== 'outer' && !targetRoom.isLocked) {
             removeRoom(selectedId);
             return;
           }
 
-          // Check if selected is equipment
           const targetEq = latestStateRef.current.equipments.find(eq => eq.id === selectedId);
           if (targetEq && !targetEq.isLocked) {
-            // Also need to check if equipment is inside a locked room
             const inLockedRoom = latestStateRef.current.rooms.some(r => r.isLocked && isPointInPolygon({ x: targetEq.x, y: targetEq.y }, r.points));
             if (!inLockedRoom) {
               removeEquipment(selectedId);
             }
           }
         }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+        // Copy
+        if (selectedId) {
+          const targetEq = latestStateRef.current.equipments.find(eq => eq.id === selectedId);
+          if (targetEq) {
+            setCopiedEqId(targetEq.id);
+          }
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+        // Paste
+        if (copiedEqId) {
+          const sourceEq = latestStateRef.current.equipments.find(eq => eq.id === copiedEqId);
+          if (sourceEq) {
+            const pointer = mousePosRef.current;
+            let copyDirection: 'up' | 'down' | 'left' | 'right' = 'right';
+
+            if (pointer) {
+              const dx = pointer.x - sourceEq.x;
+              const dy = pointer.y - sourceEq.y;
+              // 판별 로직: X축 거리와 Y축 거리 비교
+              if (Math.abs(dx) > Math.abs(dy)) {
+                copyDirection = dx > 0 ? 'right' : 'left';
+              } else {
+                copyDirection = dy > 0 ? 'down' : 'up';
+              }
+            }
+
+            const dim = EQUIPMENT_DIMS[sourceEq.type] || EQUIPMENT_DIMS['Custom'];
+            const w = sourceEq.width || dim.width;
+            const h = sourceEq.height || dim.height;
+            const clearance = sourceEq.clearance ?? 40;
+            const clearancePx = clearance / 2;
+            
+            const rot = (sourceEq.rotation % 180 + 180) % 180;
+            const isHorizontal = rot < 45 || rot > 135;
+            const vw = isHorizontal ? w : h;
+            const vh = isHorizontal ? h : w;
+
+            const offsetMagnitudeX = vw + clearancePx * 2;
+            const offsetMagnitudeY = vh + clearancePx * 2;
+            
+            let offsetX = 0;
+            let offsetY = 0;
+
+            switch (copyDirection) {
+              case 'up': offsetY = -offsetMagnitudeY; break;
+              case 'down': offsetY = offsetMagnitudeY; break;
+              case 'left': offsetX = -offsetMagnitudeX; break;
+              case 'right': offsetX = offsetMagnitudeX; break;
+            }
+
+            const newId = `${sourceEq.type}-${Date.now()}-paste`;
+            const newCopy: EquipmentData = {
+              ...sourceEq,
+              id: newId,
+              x: sourceEq.x + offsetX,
+              y: sourceEq.y + offsetY,
+            };
+
+            const newEqs = [...latestStateRef.current.equipments, newCopy];
+            setEquipments(newEqs);
+            scheduleHistoryCommit({ equipments: newEqs });
+            
+            // 붙여넣기 한 객체를 바로 선택 상태로 만들고, 
+            // 클립보드 기준도 새 객체로 갱신하여 연속 붙여넣기가 자연스럽게 이어지도록 함
+            setSelectedId(newId);
+            setCopiedEqId(newId);
+          }
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedId, removeRoom, removeEquipment]);
+  }, [selectedId, copiedEqId, removeRoom, removeEquipment, scheduleHistoryCommit]);
 
   return (
     <main className={styles.layout}>
@@ -1014,6 +1084,7 @@ export default function Home() {
           selectedId={selectedId}
           setSelectedId={setSelectedId}
           movingRoomId={movingRoomId}
+          onPointerMove={(pos) => { mousePosRef.current = pos; }}
         />
       </div>
 

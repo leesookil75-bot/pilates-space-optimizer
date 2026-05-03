@@ -51,13 +51,14 @@ interface EditorCanvasProps {
   editorRef?: React.RefObject<EditorCanvasHandle | null>;
   readOnly?: boolean;
   movingRoomId?: string | null;
+  onPointerMove?: (pos: Point) => void;
 }
 
 export interface EditorCanvasHandle {
   downloadImage: (fileName?: string) => void;
 }
 
-export default function EditorCanvas({ equipments, setEquipments, rooms, setRooms, selectedId, setSelectedId, editorRef, readOnly = false, movingRoomId = null }: EditorCanvasProps) {
+export default function EditorCanvas({ equipments, setEquipments, rooms, setRooms, selectedId, setSelectedId, editorRef, readOnly = false, movingRoomId = null, onPointerMove }: EditorCanvasProps) {
   const stageRef = useRef<Konva.Stage>(null);
   const mainLayerRef = useRef<Konva.Layer>(null);
   
@@ -394,6 +395,15 @@ export default function EditorCanvas({ equipments, setEquipments, rooms, setRoom
           onWheel={handleWheel}
           onMouseDown={checkDeselect}
           onTouchStart={checkDeselect}
+          onMouseMove={() => {
+            if (onPointerMove) {
+              const stage = stageRef.current;
+              if (stage) {
+                const pos = stage.getRelativePointerPosition();
+                if (pos) onPointerMove(pos);
+              }
+            }
+          }}
           draggable
           onDragEnd={(e) => {
             // Only update if it's the stage being dragged, not an equipment
