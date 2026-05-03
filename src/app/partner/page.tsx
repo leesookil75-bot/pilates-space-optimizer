@@ -68,6 +68,17 @@ export default function PartnerDashboard() {
       alert('견적서 파일을 반드시 첨부해 주세요.');
       return;
     }
+
+    // Client-side coin validation to prevent unnecessary file upload delay
+    const isUnlocked = partnerData?.unlockedQuotes?.includes(targetQuote.id);
+    const isEstimated = partnerData?.estimatedQuotes?.includes(targetQuote.id);
+    const isFreeToSend = isUnlocked || isEstimated;
+    const estimateCost = settings?.estimateCost || 5000;
+    
+    if (!isFreeToSend && (partnerData?.coins || 0) < estimateCost) {
+      alert(`견적 발송에 필요한 코인이 부족합니다. (필요: ${estimateCost} 코인, 보유: ${partnerData?.coins || 0} 코인)\n상단의 '충전 안내'를 통해 코인을 충전해 주세요.`);
+      return;
+    }
     
     setSendingEstimate(true);
     try {
