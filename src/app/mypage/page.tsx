@@ -3,7 +3,7 @@
 import { useSession, signIn } from 'next-auth/react';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { FileText, Clock, CheckCircle, Package, ArrowRight, X } from 'lucide-react';
+import { FileText, Clock, Package, ArrowRight } from 'lucide-react';
 
 interface Estimate {
   id: string;
@@ -23,7 +23,7 @@ interface QuoteRequest {
   status: string;
   createdAt: string;
   estimatesSent?: string[];
-  estimates?: Estimate[]; // Joined on client for display
+  estimates?: Estimate[];
 }
 
 export default function MyPage() {
@@ -32,7 +32,6 @@ export default function MyPage() {
   
   const [quotes, setQuotes] = useState<QuoteRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedQuote, setSelectedQuote] = useState<QuoteRequest | null>(null);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -41,10 +40,10 @@ export default function MyPage() {
   }, [status]);
 
   useEffect(() => {
-    if (session?.user?.email) {
+    if (status === 'authenticated') {
       fetchMyQuotes();
     }
-  }, [session]);
+  }, [status]);
 
   const fetchMyQuotes = async () => {
     try {
@@ -52,7 +51,7 @@ export default function MyPage() {
       const res = await fetch('/api/quotes/my-quotes');
       if (res.ok) {
         const data = await res.json();
-        setQuotes(data.quotes);
+        setQuotes(data.quotes || []);
       }
     } catch (err) {
       console.error('Failed to fetch quotes:', err);
@@ -70,27 +69,34 @@ export default function MyPage() {
           body: JSON.stringify({ estimateId: estimate.id })
         });
         
-        // Update local state to remove badge immediately
         setQuotes(prev => prev.map(q => ({
           ...q,
           estimates: q.estimates?.map(e => e.id === estimate.id ? { ...e, isRead: true } : e)
         })));
         
-        // Dispatch custom event to update TopBar badge
         window.dispatchEvent(new Event('estimatesRead'));
       } catch (err) {
         console.error('Failed to mark read', err);
       }
     }
-    
-    // Open file
     window.open(estimate.fileUrl, '_blank');
   };
 
   if (status === 'loading' || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb' }}>
+        <div style={{
+          border: '4px solid rgba(59, 130, 246, 0.2)',
+          borderTop: '4px solid #3b82f6',
+          borderRadius: '50%',
+          width: '48px',
+          height: '48px',
+          animation: 'spin 1s linear infinite'
+        }}>
+          <style>{`
+            @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+          `}</style>
+        </div>
       </div>
     );
   }
@@ -98,106 +104,116 @@ export default function MyPage() {
   if (status === 'unauthenticated') return null;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-8 flex items-center justify-between">
+    <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb', padding: '48px 16px' }}>
+      <div style={{ maxWidth: '896px', margin: '0 auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
           <div>
-            <h1 className="text-3xl font-extrabold text-gray-900">내 견적함 📦</h1>
-            <p className="mt-2 text-sm text-gray-600">
+            <h1 style={{ fontSize: '1.875rem', fontWeight: 800, color: '#111827', margin: 0 }}>내 견적함 📦</h1>
+            <p style={{ marginTop: '8px', fontSize: '0.875rem', color: '#4b5563', margin: '8px 0 0 0' }}>
               {session?.user?.name}님이 요청하신 필라테스 인테리어/기구 견적 진행 상황입니다.
             </p>
           </div>
           <button
             onClick={() => router.push('/')}
-            className="text-blue-600 hover:text-blue-800 font-medium"
+            style={{ color: '#2563eb', fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem' }}
           >
             &larr; 도면 편집기로 돌아가기
           </button>
         </div>
 
         {quotes.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-            <Package className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900">접수된 견적이 없습니다</h3>
-            <p className="mt-2 text-gray-500">도면을 그리고 첫 견적을 요청해 보세요!</p>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)', border: '1px solid #e5e7eb', padding: '48px', textAlign: 'center' }}>
+            <Package style={{ margin: '0 auto 16px auto', height: '48px', width: '48px', color: '#9ca3af' }} />
+            <h3 style={{ fontSize: '1.125rem', fontWeight: 500, color: '#111827', margin: 0 }}>접수된 견적이 없습니다</h3>
+            <p style={{ marginTop: '8px', color: '#6b7280', margin: '8px 0 0 0' }}>도면을 그리고 첫 견적을 요청해 보세요!</p>
             <button
               onClick={() => router.push('/')}
-              className="mt-6 inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+              style={{ marginTop: '24px', display: 'inline-flex', alignItems: 'center', padding: '8px 16px', border: '1px solid transparent', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)', fontSize: '0.875rem', fontWeight: 500, borderRadius: '6px', color: '#ffffff', backgroundColor: '#2563eb', cursor: 'pointer' }}
             >
               새 도면 시작하기
             </button>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             {quotes.map((quote) => {
               const unreadCount = quote.estimates?.filter(e => !e.isRead).length || 0;
               const hasEstimates = quote.estimates && quote.estimates.length > 0;
               
               return (
-                <div key={quote.id} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                  <div className="px-6 py-5 border-b border-gray-200 bg-gray-50 flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <h3 className="text-lg leading-6 font-semibold text-gray-900 flex items-center">
-                        {quote.region} 필라테스 오픈 건
-                        {unreadCount > 0 && (
-                          <span className="ml-3 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                            새 견적 {unreadCount}건
+                <div key={quote.id} style={{ backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
+                  <div style={{ padding: '20px 24px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                      <div>
+                        <h3 style={{ fontSize: '1.125rem', lineHeight: '1.5rem', fontWeight: 600, color: '#111827', display: 'flex', alignItems: 'center', margin: 0 }}>
+                          {quote.region} 필라테스 오픈 건
+                          {unreadCount > 0 && (
+                            <span style={{ marginLeft: '12px', display: 'inline-flex', alignItems: 'center', padding: '2px 10px', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: 500, backgroundColor: '#fee2e2', color: '#991b1b' }}>
+                              새 견적 {unreadCount}건
+                            </span>
+                          )}
+                        </h3>
+                        <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', fontSize: '0.875rem', color: '#6b7280', gap: '16px' }}>
+                          <span style={{ display: 'flex', alignItems: 'center' }}>
+                            <Clock style={{ flexShrink: 0, marginRight: '6px', height: '16px', width: '16px', color: '#9ca3af' }} />
+                            오픈예정: {quote.expectedDate}
                           </span>
-                        )}
-                      </h3>
-                      <div className="mt-1 flex items-center text-sm text-gray-500 space-x-4">
-                        <span className="flex items-center">
-                          <Clock className="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" />
-                          오픈예정: {quote.expectedDate}
-                        </span>
-                        <span className="flex items-center">
-                          <FileText className="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" />
-                          접수일: {new Date(quote.createdAt).toLocaleDateString()}
+                          <span style={{ display: 'flex', alignItems: 'center' }}>
+                            <FileText style={{ flexShrink: 0, marginRight: '6px', height: '16px', width: '16px', color: '#9ca3af' }} />
+                            접수일: {new Date(quote.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', padding: '4px 12px', borderRadius: '9999px', fontSize: '0.875rem', fontWeight: 500,
+                          backgroundColor: quote.status === '신규 접수' ? '#dbeafe' : quote.status === '분석 중' ? '#fef3c7' : hasEstimates ? '#d1fae5' : '#f3f4f6',
+                          color: quote.status === '신규 접수' ? '#1e40af' : quote.status === '분석 중' ? '#92400e' : hasEstimates ? '#065f46' : '#1f2937'
+                        }}>
+                          {hasEstimates ? '견적 도착' : quote.status}
                         </span>
                       </div>
-                    </div>
-                    
-                    <div className="mt-4 sm:mt-0 flex items-center">
-                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                        quote.status === '신규 접수' ? 'bg-blue-100 text-blue-800' : 
-                        quote.status === '분석 중' ? 'bg-yellow-100 text-yellow-800' : 
-                        hasEstimates ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {hasEstimates ? '견적 도착' : quote.status}
-                      </span>
                     </div>
                   </div>
                   
-                  <div className="px-6 py-5">
+                  <div style={{ padding: '20px 24px' }}>
                     {!hasEstimates ? (
-                      <div className="text-center py-6">
-                        <p className="text-gray-500">파트너사들이 도면을 분석 중입니다. 조금만 기다려주세요!</p>
+                      <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                        <p style={{ color: '#6b7280', margin: 0 }}>파트너사들이 도면을 분석 중입니다. 조금만 기다려주세요!</p>
                       </div>
                     ) : (
-                      <div className="space-y-4">
-                        <h4 className="font-medium text-gray-900 mb-3">도착한 견적서 ({quote.estimates!.length}건)</h4>
-                        <div className="grid gap-4 sm:grid-cols-2">
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <h4 style={{ fontWeight: 500, color: '#111827', margin: 0 }}>도착한 견적서 ({quote.estimates!.length}건)</h4>
+                        <div style={{ display: 'grid', gap: '16px', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
                           {quote.estimates!.map((est) => (
                             <div 
                               key={est.id} 
-                              className={`relative rounded-lg border p-4 hover:shadow-md transition-shadow cursor-pointer ${!est.isRead ? 'border-blue-300 bg-blue-50' : 'border-gray-200'}`}
+                              style={{
+                                position: 'relative', borderRadius: '8px', border: est.isRead ? '1px solid #e5e7eb' : '1px solid #93c5fd', padding: '16px',
+                                backgroundColor: est.isRead ? '#ffffff' : '#eff6ff', cursor: 'pointer', transition: 'box-shadow 0.2s',
+                              }}
                               onClick={() => handleReadEstimate(est)}
+                              onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'}
+                              onMouseLeave={(e) => e.currentTarget.style.boxShadow = 'none'}
                             >
                               {!est.isRead && (
-                                <span className="absolute top-0 right-0 -mt-2 -mr-2 flex h-4 w-4">
-                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                  <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500"></span>
+                                <span style={{ position: 'absolute', top: 0, right: 0, marginTop: '-8px', marginRight: '-8px', display: 'flex', height: '16px', width: '16px' }}>
+                                  <span style={{ position: 'absolute', display: 'inline-flex', height: '100%', width: '100%', borderRadius: '50%', backgroundColor: '#f87171', opacity: 0.75, animation: 'ping 1s cubic-bezier(0, 0, 0.2, 1) infinite' }}></span>
+                                  <span style={{ position: 'relative', display: 'inline-flex', borderRadius: '50%', height: '16px', width: '16px', backgroundColor: '#ef4444' }}></span>
                                 </span>
                               )}
-                              <div className="flex justify-between items-start mb-2">
-                                <h5 className="font-bold text-gray-900">{est.partnerName}</h5>
-                                {est.price && <span className="text-blue-600 font-bold">{est.price} 원</span>}
+                              <style>{`
+                                @keyframes ping { 75%, 100% { transform: scale(2); opacity: 0; } }
+                              `}</style>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                                <h5 style={{ fontWeight: 700, color: '#111827', margin: 0 }}>{est.partnerName}</h5>
+                                {est.price && <span style={{ color: '#2563eb', fontWeight: 700 }}>{est.price} 원</span>}
                               </div>
-                              <p className="text-sm text-gray-600 line-clamp-2 mb-3 h-10">{est.message}</p>
-                              <div className="flex items-center text-sm text-blue-600 font-medium">
-                                <FileText className="h-4 w-4 mr-1" />
+                              <p style={{ fontSize: '0.875rem', color: '#4b5563', marginBottom: '12px', height: '40px', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', margin: '0 0 12px 0' }}>{est.message}</p>
+                              <div style={{ display: 'flex', alignItems: 'center', fontSize: '0.875rem', color: '#2563eb', fontWeight: 500 }}>
+                                <FileText style={{ height: '16px', width: '16px', marginRight: '4px' }} />
                                 첨부 견적서 열람
-                                <ArrowRight className="h-4 w-4 ml-1" />
+                                <ArrowRight style={{ height: '16px', width: '16px', marginLeft: '4px' }} />
                               </div>
                             </div>
                           ))}

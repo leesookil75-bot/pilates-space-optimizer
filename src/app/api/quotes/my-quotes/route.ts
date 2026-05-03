@@ -8,22 +8,32 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || !session.user || !session.user.email) {
+    if (!session || !session.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const userEmail = session.user.email;
+    const userName = session.user.name;
+
+    if (!userEmail && !userName) {
+      return NextResponse.json({ error: 'No user identifier found' }, { status: 400 });
+    }
 
     // 1. Fetch user's quote_requests
-    const quotesSnapshot = await adminDb.collection('quote_requests')
-      .where('userEmail', '==', userEmail)
-      .get();
+    let quotesQuery: any = adminDb.collection('quote_requests');
+    if (userEmail) {
+      quotesQuery = quotesQuery.where('userEmail', '==', userEmail);
+    } else {
+      quotesQuery = quotesQuery.where('userName', '==', userName);
+    }
+
+    const quotesSnapshot = await quotesQuery.get();
 
     if (quotesSnapshot.empty) {
       return NextResponse.json({ quotes: [] });
     }
 
-    const quotes = quotesSnapshot.docs.map(doc => ({
+    const quotes = quotesSnapshot.docs.map((doc: any) => ({
       id: doc.id,
       ...doc.data(),
       createdAt: doc.data().createdAt || new Date().toISOString()
@@ -32,7 +42,7 @@ export async function GET(req: Request) {
     });
 
     // 2. Fetch all estimates for these quotes
-    const quoteIds = quotes.map(q => q.id);
+    const quoteIds = quotes.map((q: any) => q.id);
     const estimates: any[] = [];
     
     // Chunking to handle >10 quoteIds
@@ -56,7 +66,7 @@ export async function GET(req: Request) {
     });
 
     // 3. Join estimates into quotes
-    const joinedQuotes = quotes.map(quote => ({
+    const joinedQuotes = quotes.map((quote: any) => ({
       ...quote,
       estimates: estimates.filter(e => e.quoteId === quote.id)
     }));
