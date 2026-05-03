@@ -371,15 +371,21 @@ export default function PartnerDashboard() {
           <h1 style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#0f172a' }}>🤝 제휴사 파트너 오더 현황</h1>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             {partnerData && (
-              <div style={{ background: 'white', padding: '8px 16px', borderRadius: '8px', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ fontSize: '15px', fontWeight: 'bold', color: '#0f172a' }}>💰 내 코인: <span style={{ color: '#3b82f6' }}>{partnerData.coins || 0}</span>개</span>
-                <button 
-                  onClick={() => setChargeModalOpen(true)}
-                  style={{ background: '#f8fafc', border: '1px solid #cbd5e1', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', color: '#475569' }}
-                >
-                  충전 안내
-                </button>
-              </div>
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#e0e7ff', padding: '8px 12px', borderRadius: '8px' }}>
+                  <span style={{ fontSize: '16px' }}>🏢</span>
+                  <span style={{ fontSize: '15px', fontWeight: 'bold', color: '#4338ca' }}>{partnerData.companyName}</span>
+                </div>
+                <div style={{ background: 'white', padding: '8px 16px', borderRadius: '8px', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span style={{ fontSize: '15px', fontWeight: 'bold', color: '#0f172a' }}>💰 내 코인: <span style={{ color: '#3b82f6' }}>{partnerData.coins || 0}</span>개</span>
+                  <button 
+                    onClick={() => setChargeModalOpen(true)}
+                    style={{ background: '#f8fafc', border: '1px solid #cbd5e1', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', cursor: 'pointer', fontWeight: 'bold', color: '#475569' }}
+                  >
+                    충전 안내
+                  </button>
+                </div>
+              </>
             )}
             <button 
               onClick={() => { setIsAuthenticated(false); setPassword(''); setQuotes([]); setPartnerData(null); }}
