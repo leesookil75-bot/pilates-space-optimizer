@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import Editor, { EditorCanvasHandle, calculateRoomAreaInfo } from '@/components/Editor/EditorCanvas';
+import Editor, { EditorCanvasHandle, calculateRoomAreaInfo, isPointInPolygon } from '@/components/Editor/EditorCanvas';
 import { EquipmentData, EquipmentType, EQUIPMENT_DIMS } from '@/components/Editor/Equipment';
 import { useSession, signIn } from 'next-auth/react';
 import styles from './page.module.css';
@@ -541,6 +541,39 @@ export default function Home() {
   
   // 예상 월 최대 매출액 (개인 8만*5회*20일=800만, 그룹 2만*5회*20일=200만)
   const maxRevenueMonthly = (privateRoomCount * 8000000) + (estimatedGroupCapacity * 2000000);
+
+  // Keyboard shortcuts for Delete/Backspace
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        // Prevent deleting if the user is typing in an input field
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+          return;
+        }
+
+        if (selectedId) {
+          // Check if selected is a room
+          const targetRoom = latestStateRef.current.rooms.find(r => r.id === selectedId);
+          if (targetRoom && targetRoom.type !== 'outer' && !targetRoom.isLocked) {
+            removeRoom(selectedId);
+            return;
+          }
+
+          // Check if selected is equipment
+          const targetEq = latestStateRef.current.equipments.find(eq => eq.id === selectedId);
+          if (targetEq && !targetEq.isLocked) {
+            // Also need to check if equipment is inside a locked room
+            const inLockedRoom = latestStateRef.current.rooms.some(r => r.isLocked && isPointInPolygon({ x: targetEq.x, y: targetEq.y }, r.points));
+            if (!inLockedRoom) {
+              removeEquipment(selectedId);
+            }
+          }
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedId, removeRoom, removeEquipment]);
 
   return (
     <main className={styles.layout}>

@@ -8,7 +8,7 @@ import Equipment, { EquipmentData, EQUIPMENT_DIMS } from './Equipment';
 import { KonvaEventObject } from 'konva/lib/Node';
 import { RoomData, Point } from '@/app/page';
 
-function isPointInPolygon(point: Point, vs: Point[]) {
+export function isPointInPolygon(point: Point, vs: Point[]) {
   let inside = false;
   for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
     const xi = vs[i].x, yi = vs[i].y;
